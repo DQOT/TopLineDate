@@ -362,8 +362,11 @@ public class DateService extends AccessibilityService
 
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && pkg != null && !fromSystemUi) {
             CharSequence cls = event.getClassName();
-            // Toasts pop up over whatever app is in front, so they do not change it.
-            if (cls == null || !cls.toString().contains("Toast")) onAppShown(pkg.toString());
+            // Toasts pop up over whatever app is in front, and our own date window announces
+            // itself when shown; neither is an app coming to the front.
+            boolean ownOverlay = pkg.toString().equals(getPackageName())
+                    && (cls == null || !cls.toString().contains("SettingsActivity"));
+            if (!ownOverlay && (cls == null || !cls.toString().contains("Toast"))) onAppShown(pkg.toString());
         }
 
         // Leaving fullscreen: SystemUI stirs ~0.3 s before the bar is listed again. A rotation
@@ -371,12 +374,47 @@ public class DateService extends AccessibilityService
         long now = SystemClock.uptimeMillis();
         if (fromSystemUi && !statusBarVisible && !barExpanded && screenOn && unlocked
                 && prefs.getBoolean(Prefs.PREDICT, Prefs.DEF_PREDICT)
-                && now - barGoneSince > 1000 && now - lastConfigAt > 1500) {
+                && now - barGoneSince > 1000 && now - lastConfigAt > 1500
+                && withinBarStrip(event)) {
+            if (!predictShown) {
+                AccessibilityNodeInfo src = event.getSource();
+                Rect r = new Rect();
+                if (src != null) src.getBoundsInScreen(r);
+                Log.i(TAG, "predict-show " + AccessibilityEvent.eventTypeToString(type)
+                        + " win=" + event.getWindowId() + " src=" + (src == null ? "null" : src.getClassName()
+                        + " " + r.toShortString()) + " windows=" + windowSummary());
+            }
             predictShown = true;
             handler.removeCallbacks(clearPredictShow);
             handler.postDelayed(clearPredictShow, 700);   // undone unless the bar comes back
         }
         checkStatusBar();
+    }
+
+    /**
+     * The bar coming back first stirs the window handle: a narrow box at the top exactly as tall
+     * as the bar (about 267 x 105 here). A heads-up notification stirs a wide, short card as it
+     * drops in ([730,0][1790,40]), which must not count.
+     */
+    private boolean withinBarStrip(AccessibilityEvent event) {
+        AccessibilityNodeInfo src = event.getSource();
+        if (src == null) return false;
+        Rect r = new Rect();
+        src.getBoundsInScreen(r);
+        int screenWidth = windowManager.getCurrentWindowMetrics().getBounds().width();
+        return r.top <= 2 && Math.abs(r.height() - barHeight) <= 6 && r.width() > 0
+                && r.width() < screenWidth * 0.2f;
+    }
+
+    private String windowSummary() {
+        StringBuilder sb = new StringBuilder();
+        Rect b = new Rect();
+        for (AccessibilityWindowInfo w : getWindows()) {
+            w.getBoundsInScreen(b);
+            sb.append('[').append(w.getType()).append(" id").append(w.getId()).append(' ')
+              .append(b.toShortString()).append(w.isFocused() ? " F" : "").append(']');
+        }
+        return sb.toString();
     }
 
     private void onAppShown(String app) {
