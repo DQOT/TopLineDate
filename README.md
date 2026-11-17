@@ -123,39 +123,6 @@ ColorOS에서 `SecurityException`이 나면 개발자 옵션의 **Disable System
 - 부동창의 점 세 개 메뉴를 연 채로 알림창을 내리면, 날짜가 잠깐 남아 있다가 사라집니다.
 - 다른 제조사의 상단 바 구조에서는 시계를 찾지 못할 수 있습니다. 그때는 **시계 옆에 자동으로 붙이기**를 끄고 X 좌표를 직접 지정합니다.
 
-## 직접 빌드하기
-
-Gradle 없이 Android SDK 도구만으로 빌드합니다.
-
-필요한 것:
-- JDK 17 이상
-- Android SDK: `platforms;android-36`, 최근 `build-tools`
-
-```sh
-export JAVA_HOME=/path/to/jdk
-export ANDROID_HOME=/path/to/android-sdk
-./build.sh            # build/TopLineDate.apk
-./build.sh install    # 빌드 후 adb install
-```
-
-처음 빌드하면 서명 키가 `keys/release.jks`에 만들어집니다. 이 폴더는 git에 올라가지 않습니다. 비밀번호는 `KEYSTORE_PASSWORD` 환경 변수로 정할 수 있습니다. 업데이트는 같은 키로 서명해야 덮어 설치되니 키를 잘 보관하세요.
-
-### ADB로 값 조정하기
-
-설정 화면 대신 ADB로도 값을 바꿀 수 있습니다. 크기와 위치 값에는 디스플레이 배율이 붙습니다(예: 표준은 `@420`).
-
-```sh
-adb shell am broadcast -n io.github.dqot.toplinedate/.TuneReceiver --ef size@420 32 --ei gapIcons@420 14
-adb logcat -s TopLineDate    # 현재 설정과 동작 기록
-```
-
-## 동작 원리
-
-- **상단 바 감지**: 접근성 창 목록에서 화면 맨 위의 가로로 긴 시스템 창을 상단 바로 봅니다. 전체 화면에서는 목록에서 빠지고, 알림창과 잠금 화면에서는 키가 큰 창으로 바뀝니다.
-- **시계 따라가기**: 상단 바 안에서 시간 모양의 글자(TextView)를 시계로 찾고, 그 오른쪽에 붙은 아이콘까지 포함한 끝 위치에 날짜를 둡니다. 시계가 숨겨지면 날짜도 숨깁니다. 최근 앱 화면, 전체 화면 진입, 잠금 해제 직후가 여기에 해당합니다.
-- **잔상 방지 이동**: 상단 바는 1분에 1px씩 옆으로 움직이고, 세로와 가로에서 같은 양만큼 움직입니다. 그래서 방향별 기준 위치와 현재 이동량을 따로 기억합니다.
-- **표시 위치**: 상단 바보다 위층에 그릴 수 있는 창은 루팅 없이는 접근성 오버레이뿐입니다.
-
 ## 라이선스
 
 [MIT](LICENSE)
