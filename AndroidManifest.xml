@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.dqot.toplinedate"
-    android:versionCode="2"
-    android:versionName="1.0.1">
+    android:versionCode="3"
+    android:versionName="1.0.2">
 
     <!-- Only for the "test notification" button on the settings screen. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Labs, off by default: landscape while an app is fullscreen goes through the system
+         rotation lock ("modify system settings", allowed by the user in the app's settings). -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+
+    <!-- The labs app list shows launchable apps. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <!-- Granted once over adb; lets opening the app re-enable its own accessibility service. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 

@@ -72,6 +72,10 @@ public class SettingsActivity extends Activity {
         setContentView(scroll);
 
         header();
+        if (getIntent().getBooleanExtra(EXTRA_LABS, false)) {
+            labsPage();
+            return;
+        }
 
         section("앱 유지", "최근 앱 모두 닫기에 꺼지지 않게 하려면, 최근 앱 화면에서 이 앱 카드를 잠근 뒤 "
                 + "'최근 앱에 표시'를 끄세요. 잠금은 유지되고 카드만 숨겨집니다.");
@@ -117,7 +121,93 @@ public class SettingsActivity extends Activity {
         number("앱 위 회전 후 대기", "계속 표시를 0으로 했을 때", Prefs.ROTATE_DELAY, Prefs.DEF_ROTATE_DELAY, 10, false);
         number("잠금 해제 후 대기 (앱 위)", null, Prefs.UNLOCK_DELAY, Prefs.DEF_UNLOCK_DELAY, 10, false);
         number("잠금 해제 후 대기 (홈 화면)", null, Prefs.HOME_UNLOCK_DELAY, Prefs.DEF_HOME_UNLOCK_DELAY, 10, false);
+
+        section("실험실", null);
+        LinearLayout entry = row();
+        entry.addView(labels("실험실", "날짜 표시와 별개인 실험 기능. 전체 화면일 때 가로로 회전"),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        labEntryState = small("");
+        labEntryState.setTextSize(15);
+        entry.addView(labEntryState);
+        entry.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)
+                .putExtra(EXTRA_LABS, true)));
+        card.addView(entry);
         trimDivider();
+    }
+
+    private static final String EXTRA_LABS = "labs";
+    private TextView labEntryState;
+
+    /** The labs page: experimental features, apart from the date settings. */
+    private void labsPage() {
+        section("실험실", "날짜 표시와 별개인 실험 기능입니다. 기본값은 꺼짐입니다.");
+        toggle("전체 화면일 때 가로로 회전", "아래에서 고른 앱이 전체 화면이 되면 가로로 고정하고, "
+                + "전체 화면이 풀리거나 다른 앱으로 가면 원래 회전 설정으로 돌려놓습니다. "
+                + "태블릿용 YouTube처럼 스스로 가로로 돌지 않는 앱을 위한 기능입니다.",
+                Prefs.LAB_ROTATE, Prefs.DEF_LAB_ROTATE, null);
+        labPermissionRow();
+        labApps();
+        trimDivider();
+    }
+
+    private TextView labPermission;
+
+    /** The rotation goes through the system rotation lock, which needs "modify system settings". */
+    private void labPermissionRow() {
+        LinearLayout row = row();
+        LinearLayout text = labels("시스템 설정 수정 권한", "화면 회전 잠금을 잠깐 가로로 걸기 위해 필요합니다");
+        labPermission = small("");
+        text.addView(labPermission);
+        row.addView(text, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        Button open = new Button(this);
+        open.setText("허용하기");
+        open.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                android.net.Uri.parse("package:" + getPackageName()))));
+        row.addView(open);
+        card.addView(row);
+        divider();
+    }
+
+    /** Launchable apps with a checkbox each; checked ones first, then by name. */
+    private void labApps() {
+        android.content.pm.PackageManager pm = getPackageManager();
+        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        java.util.Set<String> chosen = Prefs.labApps(prefs);
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        java.util.List<android.content.pm.ResolveInfo> apps = new java.util.ArrayList<>();
+        for (android.content.pm.ResolveInfo info : pm.queryIntentActivities(launcher, 0)) {
+            String pkg = info.activityInfo.packageName;
+            if (!pkg.equals(getPackageName()) && seen.add(pkg)) apps.add(info);
+        }
+        java.text.Collator collator = java.text.Collator.getInstance();
+        apps.sort((a, b) -> {
+            boolean ca = chosen.contains(a.activityInfo.packageName);
+            boolean cb = chosen.contains(b.activityInfo.packageName);
+            if (ca != cb) return ca ? -1 : 1;
+            return collator.compare(a.loadLabel(pm).toString(), b.loadLabel(pm).toString());
+        });
+        for (android.content.pm.ResolveInfo info : apps) {
+            String pkg = info.activityInfo.packageName;
+            LinearLayout row = row();
+            android.widget.ImageView icon = new android.widget.ImageView(this);
+            icon.setImageDrawable(info.loadIcon(pm));
+            LinearLayout.LayoutParams iconSize = new LinearLayout.LayoutParams(dp(32), dp(32));
+            iconSize.setMarginEnd(dp(12));
+            row.addView(icon, iconSize);
+            row.addView(labels(info.loadLabel(pm).toString(), null),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            android.widget.CheckBox box = new android.widget.CheckBox(this);
+            box.setChecked(chosen.contains(pkg));
+            box.setOnCheckedChangeListener((b, on) -> {
+                java.util.Set<String> set = Prefs.labApps(prefs);
+                if (on) set.add(pkg); else set.remove(pkg);
+                prefs.edit().putStringSet(Prefs.LAB_APPS, set).apply();
+            });
+            row.addView(box);
+            row.setOnClickListener(v -> box.toggle());
+            card.addView(row);
+            divider();
+        }
     }
 
     private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -167,6 +257,12 @@ public class SettingsActivity extends Activity {
     }
 
     private void updateStatus() {
+        if (labEntryState != null) {
+            labEntryState.setText(prefs.getBoolean(Prefs.LAB_ROTATE, Prefs.DEF_LAB_ROTATE) ? "켜짐  ›" : "꺼짐  ›");
+        }
+        if (labPermission != null) {
+            labPermission.setText(FullscreenRotator.canWrite(this) ? "허용됨" : "필요: 허용하기를 눌러 주세요");
+        }
         int screen = getResources().getConfiguration().densityDpi;
         status.setText("TopLineDate · 서비스: " + DateService.status() + "\n디스플레이 크기: " + screenLabel(screen)
                 + "  ·  적용 중인 프로필: " + screenLabel(dpi));

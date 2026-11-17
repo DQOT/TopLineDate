@@ -76,6 +76,18 @@ final class Prefs {
     static final int DPI_SMALL = 356;      // display size "작게"
     static final int DPI_STANDARD = 420;   // display size "표준" (device default)
 
+    // ---- labs ---------------------------------------------------------------------------------
+    static final String LAB_ROTATE = "labRotate";          // landscape while a listed app is fullscreen
+    static final String LAB_APPS = "labApps";              // Set<String> of package names
+    static final boolean DEF_LAB_ROTATE = false;
+    static final java.util.Set<String> DEF_LAB_APPS = java.util.Collections.unmodifiableSet(
+            new java.util.HashSet<>(java.util.Arrays.asList(
+                    "com.google.android.youtube", "com.netflix.mediaclient")));
+
+    static java.util.Set<String> labApps(SharedPreferences prefs) {
+        return new java.util.HashSet<>(prefs.getStringSet(LAB_APPS, DEF_LAB_APPS));
+    }
+
     /** Keys from earlier versions, removed on start. */
     static final String[] OBSOLETE_KEYS = {"predictHide", "dropDecideMs", "probe", "probe2",
             "probe4", SIZE, GAP, GAP_ICONS, PORTRAIT_Y, LANDSCAPE_Y, FINE_Y_PORTRAIT,

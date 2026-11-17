@@ -132,6 +132,7 @@ public class DateService extends AccessibilityService
     private boolean fromFullscreen;                 // hidden because an app went fullscreen
     private String fullscreenApp = "";
     private ValueAnimator slider;
+    private FullscreenRotator rotator;              // labs: landscape while fullscreen
 
     // ---- colour -------------------------------------------------------------------------------
     private int autoColor = LIGHT_TEXT;
@@ -174,6 +175,8 @@ public class DateService extends AccessibilityService
         dpi = Prefs.activeDpi(this, prefs);
         screenDpi = getResources().getConfiguration().densityDpi;
         loadClockGeometry();
+        rotator = new FullscreenRotator(this, prefs);
+        rotator.restoreIfStale();
 
         view = new TextView(this);
         view.setSingleLine(true);
@@ -265,7 +268,8 @@ public class DateService extends AccessibilityService
         if (!isHome()) {
             int grace = prefs.getInt(Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE);
             // The clock may vanish just before this callback and hide the date a moment early.
-            boolean wasUp = shown || lastConfigAt - hiddenAt < 400;
+            // (not when it hid because the app went fullscreen: then it should stay hidden)
+            boolean wasUp = shown || (lastConfigAt - hiddenAt < 400 && statusBarVisible && !fromFullscreen);
             Log.i(TAG, "rotate land=" + (o == 1) + " up=" + wasUp + " anchor=" + anchorRight);
             if (grace > 0 && wasUp && anchorRight >= 0) {
                 // Like a plain overlay: move at once and stay up while SystemUI re-lays the bar.
@@ -294,6 +298,9 @@ public class DateService extends AccessibilityService
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         if (view == null) return;
         dpi = Prefs.activeDpi(this, prefs);
+        if (rotator.locked() && (!rotator.enabled() || !Prefs.labApps(prefs).contains(rotator.app()))) {
+            rotator.release("설정 변경");
+        }
         applyStyle();
         updateText();
         position();
@@ -317,6 +324,7 @@ public class DateService extends AccessibilityService
 
     private void teardown() {
         handler.removeCallbacksAndMessages(null);
+        if (rotator != null) rotator.release("서비스 종료");
         if (receiver != null) {
             try { unregisterReceiver(receiver); } catch (IllegalArgumentException ignored) {}
             receiver = null;
@@ -455,8 +463,21 @@ public class DateService extends AccessibilityService
 
         if (!unlocked) wasLocked = true;
         else if (statusBarVisible) wasLocked = false;
+        checkRotator(found);
         updateText();
         refreshVisibility();
+    }
+
+    /** Labs: end the landscape lock when fullscreen ends, the app changes or the screen locks. */
+    private void checkRotator(boolean barListed) {
+        if (rotator == null || !rotator.locked()) return;
+        if (!power.isInteractive() || keyguard.isKeyguardLocked()) {
+            rotator.release("화면 꺼짐");
+        } else if (!rotator.settling()) {
+            String app = focusedAppPackage();
+            if (barListed || barExpanded) rotator.release("전체 화면 해제");
+            else if (!app.isEmpty() && !app.equals(rotator.app())) rotator.release("다른 앱으로 이동");
+        }
     }
 
     private void onBarListedChanged(boolean found, boolean expanded) {
@@ -476,6 +497,8 @@ public class DateService extends AccessibilityService
                 fromFullscreen = true;
                 fullscreenApp = focusedAppPackage();
                 Log.i(TAG, "fullscreen in " + fullscreenApp);
+                rotator.onFullscreen(fullscreenApp);
+                if (rotator.locked()) recheckIn(FullscreenRotator.SETTLE_MS + 10);
             }
         }
         Log.i(TAG, "status bar listed=" + found + " fg=" + foreground);
