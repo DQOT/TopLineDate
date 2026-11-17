@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.dqot.toplinedate"
+    android:versionCode="1"
+    android:versionName="1.0.0">
+
+    <!-- Only for the "test notification" button on the settings screen. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Granted once over adb; lets opening the app re-enable its own accessibility service. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+
+    <application
+        android:label="TopLineDate"
+        android:icon="@android:drawable/ic_menu_my_calendar"
+        android:allowBackup="false">
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.DayNight">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".DateService"
+            android:exported="true"
+            android:label="TopLineDate"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility" />
+        </service>
+
+        <!-- Lets adb (shell holds DUMP) tune settings remotely. No other app can send to it. -->
+        <receiver
+            android:name=".TuneReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+    </application>
+</manifest>
