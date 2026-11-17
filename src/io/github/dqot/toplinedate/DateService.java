@@ -358,10 +358,12 @@ public class DateService extends AccessibilityService
             if (cls == null || !cls.toString().contains("Toast")) onAppShown(pkg.toString());
         }
 
-        // Leaving fullscreen: SystemUI stirs ~0.3 s before the bar is listed again.
+        // Leaving fullscreen: SystemUI stirs ~0.3 s before the bar is listed again. A rotation
+        // stirs it too while staying fullscreen, so not right after one.
+        long now = SystemClock.uptimeMillis();
         if (fromSystemUi && !statusBarVisible && !barExpanded && screenOn && unlocked
                 && prefs.getBoolean(Prefs.PREDICT, Prefs.DEF_PREDICT)
-                && SystemClock.uptimeMillis() - barGoneSince > 1000) {
+                && now - barGoneSince > 1000 && now - lastConfigAt > 1500) {
             predictShown = true;
             handler.removeCallbacks(clearPredictShow);
             handler.postDelayed(clearPredictShow, 700);   // undone unless the bar comes back
