@@ -397,7 +397,7 @@ public class DateService extends AccessibilityService
         long now = SystemClock.uptimeMillis();
         if (fromSystemUi && !statusBarVisible && !barExpanded && screenOn && unlocked
                 && prefs.getBoolean(Prefs.PREDICT, Prefs.DEF_PREDICT)
-                && now - barGoneSince > 1000 && now - lastConfigAt > 1500
+                && now - barGoneSince > 300 && now - lastConfigAt > 1500 && !rotator.settling()
                 && withinBarStrip(event)) {
             if (!predictShown) {
                 AccessibilityNodeInfo src = event.getSource();
