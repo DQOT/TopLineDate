@@ -72,6 +72,8 @@ public class DateService extends AccessibilityService
     private static final int LIGHT_TEXT = 0xCCFFFFFF;
     private static final PathInterpolator EASE = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
     private static final android.view.animation.Interpolator ACCEL = new android.view.animation.AccelerateInterpolator();
+    // The bar drops in fast and settles slowly.
+    private static final android.view.animation.Interpolator DROP = new android.view.animation.DecelerateInterpolator(1.5f);
     private static final Pattern TIME = Pattern.compile("^[ ]*[0-9]{1,2}[ ]*[:.][ ]*[0-9]{2}.*");
 
     private static volatile String lastStatus = "not connected";
@@ -150,6 +152,18 @@ public class DateService extends AccessibilityService
         checkStatusBar();
     };
     private boolean predictHidden;
+    private int lastBarTop = Integer.MIN_VALUE;
+    private int dropFrom;                           // bar found part-way down: start the date there
+    private long clockHiddenAt;
+    private boolean menuWaitArmed;
+    private long menuEndedAt;
+    private long barListedAt;
+    private long handleStirAt;
+    private long appShownAt;
+    private static final long MENU_WAIT_MS = 60;
+    private static final long MENU_GAP_MS = 120;
+    private long barPendingSince;                   // the bar left the list in a transition
+    private static final long BAR_PENDING_MAX = 1500;
     private final Runnable clearPredictHide = () -> {
         predictHidden = false;
         checkStatusBar();
@@ -276,7 +290,7 @@ public class DateService extends AccessibilityService
         anchorCenterY = clockCenterY[o];
         anchorHasIcons = iconsWidth > 0;
 
-        if (!isHome()) {
+        {   // home too: its bar turns with the screen like an app's
             int grace = prefs.getInt(Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE);
             // The clock may vanish just before this callback and hide the date a moment early.
             // (not when it hid because the app went fullscreen: then it should stay hidden)
@@ -383,25 +397,36 @@ public class DateService extends AccessibilityService
             }
         }
 
+        // A touch on the gesture area stirs the handle window without a source first, then relays it
+        // out like fullscreen does; fullscreen has no such stir.
+        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && fromSystemUi && event.getSource() == null
+                && event.getWindowId() != barWindowId) {
+            handleStirAt = SystemClock.uptimeMillis();
+        }
         // Entering fullscreen: the app's window handle relays out ~30 ms before the clock slides up,
         // while the bar can stay listed until 0.3 s after the clock is gone.
         if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && fromSystemUi && statusBarVisible
                 && shown && !predictHidden && !barExpanded && !menuOverlay && screenOn && unlocked
                 && SystemClock.uptimeMillis() - lastConfigAt > 1500
-                && SystemClock.uptimeMillis() >= rotationGraceUntil && isHandleRelayout(event)) {
+                && SystemClock.uptimeMillis() >= rotationGraceUntil
+                && SystemClock.uptimeMillis() - barListedAt > 300   // the handle settles after the bar returns
+                && SystemClock.uptimeMillis() - handleStirAt > 200
+                && isHandleRelayout(event)
+                && !LAUNCHER.equals(focusedAppPackage())) {   // an app closing relays it out too
             Log.i(TAG, "predict-hide");
             predictHidden = true;
             handler.removeCallbacks(clearPredictHide);
             handler.postDelayed(clearPredictHide, 600);   // undone unless the bar leaves
         }
 
-        // Leaving fullscreen: SystemUI stirs ~0.3 s before the bar is listed again. A rotation
+        // Leaving fullscreen: SystemUI stirs ~0.2-0.3 s before the bar is listed again: the narrow
+        // window handle in landscape, the handle window's whole relayout in portrait. A rotation
         // stirs it too while staying fullscreen, so not right after one.
         long now = SystemClock.uptimeMillis();
         if (fromSystemUi && !statusBarVisible && !barExpanded && screenOn && unlocked
                 && prefs.getBoolean(Prefs.PREDICT, Prefs.DEF_PREDICT)
                 && now - barGoneSince > 300 && now - lastConfigAt > 1500 && !rotator.settling()
-                && withinBarStrip(event)) {
+                && (withinBarStrip(event) || isHandleRelayout(event))) {
             if (!predictShown) {
                 AccessibilityNodeInfo src = event.getSource();
                 Rect r = new Rect();
@@ -472,6 +497,7 @@ public class DateService extends AccessibilityService
 
     private void onAppShown(String app) {
         foreground = app;
+        appShownAt = SystemClock.uptimeMillis();
         Integer remembered = colorByApp.get(app);
         if (remembered != null && autoColorMode() && remembered != autoColor) {
             autoColor = remembered;   // right colour from the first frame
@@ -491,6 +517,8 @@ public class DateService extends AccessibilityService
         List<AccessibilityWindowInfo> windows = getWindows();
 
         AccessibilityWindowInfo bar = null;
+        AccessibilityWindowInfo moving = null;   // the bar part-way off the top edge
+        int movingTop = Integer.MIN_VALUE;
         boolean expanded = false;
         boolean floating = false;
         Rect b = new Rect();
@@ -500,16 +528,61 @@ public class DateService extends AccessibilityService
             if (w.getType() == AccessibilityWindowInfo.TYPE_SYSTEM) {
                 if (topWide && b.height() > barHeight * 2) expanded = true;
                 else if (topWide && b.height() > 0 && bar == null) bar = w;
+                else if (b.top < 0 && b.bottom > 0 && b.width() >= screenWidth * 0.8f
+                        && Math.abs(b.height() - barHeight) <= 6 && moving == null) {
+                    moving = w;
+                    movingTop = b.top;
+                }
             } else if (w.getType() == AccessibilityWindowInfo.TYPE_APPLICATION
                     && (b.width() < screenWidth * 0.95f || b.height() < screen.height() * 0.95f)) {
                 floating = true;
             }
         }
+        // In split screen the bar stays listed and slides; the list catches up late, so while it is
+        // hidden, take it as coming back as soon as it is seen lower than before.
+        // Moving down (or holding still while shown) counts as listed; moving up as gone.
+        boolean slidingIn = bar == null && moving != null
+                && (movingTop > lastBarTop || (movingTop == lastBarTop && statusBarVisible));
+        if (slidingIn) {
+            bar = moving;
+            if (!statusBarVisible) dropFrom = movingTop;   // the date starts where the bar is
+        } else if (bar == null && moving != null && statusBarVisible) {
+            dropFrom = movingTop;   // already on its way up: the date leaves from there too
+        }
+        lastBarTop = bar != null && !slidingIn ? 0 : movingTop;
         boolean found = bar != null;
+        // The bar can drop out of the list while it stays on screen: mid-transition the list
+        // empties (an app closing into a rotation), and the home screen loses it until it has
+        // turned. Fullscreen keeps its app window listed, and the home screen never goes
+        // fullscreen, so wait a little for those before believing the bar is gone.
+        if (!found && statusBarVisible && !expanded && screenOn && !keyguard.isKeyguardLocked()) {
+            int apps = 0;
+            boolean focusedApp = false, smallApp = false;
+            for (AccessibilityWindowInfo w : windows) {
+                if (w.getType() != AccessibilityWindowInfo.TYPE_APPLICATION) continue;
+                apps++;
+                w.getBoundsInScreen(b);
+                if (w.isFocused() || w.isActive()) focusedApp = true;
+                if (b.width() < screenWidth * 0.95f || b.height() < screen.height() * 0.95f) smallApp = true;
+            }
+            boolean menuLike = windows.size() == 1 && windows.get(0).getType() == AccessibilityWindowInfo.TYPE_SYSTEM;
+            long now = SystemClock.uptimeMillis();
+            // In between, no app has focus or the only app window is still animating; split screen
+            // and floating windows list two or more.
+            boolean between = !menuLike && (!focusedApp || (apps == 1 && smallApp));
+            if (between || LAUNCHER.equals(focusedAppPackage())) {
+                if (barPendingSince == 0) barPendingSince = now;
+                if (now - barPendingSince < BAR_PENDING_MAX) {
+                    recheckIn(100);
+                    return;
+                }
+            }
+        }
+        barPendingSince = 0;
         if (found) {
             barWindowId = bar.getId();
             if (!statusBarVisible) needClock = true;
-            if (needClock) findAnchor(bar, screenWidth);
+            if (needClock && !slidingIn) findAnchor(bar, screenWidth);   // its clock is off-place yet
         }
         // The shade is one long-lived window, seen collapsed to zero or bar size; remember it.
         for (AccessibilityWindowInfo w : windows) {
@@ -528,9 +601,19 @@ public class DateService extends AccessibilityService
                     && b.top == 0 && b.width() >= screenWidth * 0.8f && b.height() > barHeight * 4
                     && !keyguard.isKeyguardLocked() && !shadeIds.contains(w.getId())
                     && (menuOverlay || floatingSeen);
+            // Pulling the shade over the menu closes the menu, and the shade, listed just like it,
+            // follows within ~30 ms: nobody reopens the menu that fast. Remember it as the shade.
+            if (overlay && !menuOverlay && SystemClock.uptimeMillis() - menuEndedAt < 500) {
+                shadeIds.add(w.getId());
+                overlay = false;
+            }
         }
         if (found) floatingSeen = floating;   // focus leaves the floating window before its menu
         if (overlay != menuOverlay) {
+            if (!overlay) {
+                menuEndedAt = SystemClock.uptimeMillis();
+                recheckIn(MENU_GAP_MS + 5);
+            }
             menuOverlay = overlay;
             Log.i(TAG, "menu overlay=" + overlay);
         }
@@ -563,6 +646,7 @@ public class DateService extends AccessibilityService
         checkRotator(found);
         updateText();
         refreshVisibility();
+        dropFrom = 0;   // only for a show on this very check
     }
 
     /** Labs: end the landscape lock when fullscreen ends, the app changes or the screen locks. */
@@ -593,6 +677,7 @@ public class DateService extends AccessibilityService
         }
         statusBarVisible = found;
         if (found) {
+            barListedAt = now;
             rotationGraceUntil = 0;   // a rotation is over once the bar has left and come back
         } else {
             barGoneSince = now;
@@ -691,6 +776,11 @@ public class DateService extends AccessibilityService
             int ms = Math.max(0, prefs.getInt(Prefs.AFTER_CLOCK_MS, Prefs.DEF_AFTER_CLOCK_MS));
             holdUntil = SystemClock.uptimeMillis() + ms;
             recheckIn(ms + 5);
+        }
+        if (!visible) {
+            clockHiddenAt = SystemClock.uptimeMillis();
+            menuWaitArmed = floatingSeen;   // as it was then: recents turns apps into small cards
+            if (menuWaitArmed) recheckIn(MENU_WAIT_MS + 5);
         }
         if (now) refreshVisibility();
         else handler.post(this::refreshVisibility);
@@ -804,9 +894,13 @@ public class DateService extends AccessibilityService
         boolean rotating = now < rotationGraceUntil;
         // The clock state only means something while the bar is listed (in fullscreen it is
         // stale and must not block the early show); the menu overlay and settling ignore it.
+        // A floating window's menu hides the clock ~20 ms before the menu is listed: wait for it.
         boolean clockHidden = statusBarVisible && !clockVisible && !menuOverlay
-                && !rotating && now >= settleUntil;
-        boolean barUp = statusBarVisible || predictShown || menuOverlay
+                && !rotating && now >= settleUntil && !(menuWaitArmed && now - clockHiddenAt < MENU_WAIT_MS)
+                && barPendingSince == 0;   // mid-transition the clock node goes stale with the bar
+        // Closing the menu, the bar is listed again ~40 ms after the menu leaves: bridge the gap.
+        boolean menuGap = now - menuEndedAt < MENU_GAP_MS && !barExpanded;
+        boolean barUp = statusBarVisible || predictShown || menuOverlay || menuGap
                 || (rotating && !barExpanded)
                 || (!prefs.getBoolean(Prefs.HIDE_FULLSCREEN, Prefs.DEF_HIDE_FULLSCREEN) && !barExpanded);
         return prefs.getBoolean(Prefs.ENABLED, Prefs.DEF_ENABLED)
@@ -826,7 +920,8 @@ public class DateService extends AccessibilityService
             if (show) {
                 // Back from fullscreen in the same app: drop in with the bar. Going home, the
                 // launcher has focus already while the app window is still drawn on top.
-                boolean drop = fromFullscreen && prefs.getInt(Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS) > 0
+                // Only when early (predicted): found already in place, the bar has dropped in.
+                boolean drop = fromFullscreen && predictShown && prefs.getInt(Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS) > 0
                         && focusedAppPackage().equals(fullscreenApp);
                 showNow(drop);
             } else if (screenOn) {
@@ -834,11 +929,19 @@ public class DateService extends AccessibilityService
                 hiddenByClock = statusBarVisible && !clockVisible && !predictHidden;
                 int upMs = prefs.getInt(Prefs.BAR_HIDE_MS, Prefs.DEF_BAR_HIDE_MS);
                 boolean up = upMs > 0 && unlocked && !barExpanded && !menuOverlay
-                        && (predictHidden || (!statusBarVisible && hiddenAt >= rotationGraceUntil));
+                        && (predictHidden || (fromFullscreen && hiddenAt >= rotationGraceUntil
+                                && (dropFrom < 0 || hiddenAt - appShownAt < 600)));
+                // Gone without being seen to move (the list caught up late, or the app faded the
+                // bar out in place like Ridi): the clock is already gone, so is the date. An app
+                // opening straight into fullscreen slides it up while its window grows, though.
                 if (up) {
                     // Into fullscreen the clock slides up into the top edge, speeding up: follow it.
-                    view.animate().translationY(fineY() - Math.max(1, params.height)).setInterpolator(ACCEL)
-                            .setDuration(upMs)
+                    // Seen late (split screen), start from where the bar already is.
+                    float height = Math.max(1, params.height);
+                    float done = dropFrom < 0 ? Math.min(1f, -dropFrom / height) : 0f;
+                    if (done > 0) view.setTranslationY(fineY() + dropFrom);
+                    view.animate().translationY(fineY() - height).setInterpolator(done > 0 ? new android.view.animation.LinearInterpolator() : ACCEL)
+                            .setDuration((long) (upMs * (1f - done) + 0.5f))
                             .withEndAction(() -> { if (!shown) view.setVisibility(View.INVISIBLE); }).start();
                 } else {
                     view.animate().alpha(0f).setInterpolator(null).setDuration(prefs.getInt(Prefs.FADE_OUT, Prefs.DEF_FADE_OUT))
@@ -856,11 +959,33 @@ public class DateService extends AccessibilityService
 
     private void showNow(boolean drop) {
         float baseY = fineY();
-        if (drop) {
+        int partFrom = dropFrom;
+        dropFrom = 0;
+        int slideMs = prefs.getInt(Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS);
+        int lateMs = prefs.getInt(Prefs.LATE_DROP_MS, Prefs.DEF_LATE_DROP_MS);
+        if (!drop && partFrom == 0 && fromFullscreen && lateMs > 0 && statusBarVisible) {
+            // The bar was only seen once already down (split screen): a short drop for the motion.
+            float height = Math.max(1, params.height);
+            view.setAlpha(1f);
+            view.setTranslationY(baseY - height);
+            view.setVisibility(View.VISIBLE);
+            view.animate().translationY(baseY).setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .setDuration(lateMs).start();
+        } else if (!drop && partFrom < 0 && slideMs > 0) {
+            // Seen late, part-way down (split screen): only the rest of the way, at the bar's pace.
+            float height = Math.max(1, params.height);
+            view.setAlpha(1f);
+            view.setTranslationY(baseY + partFrom);
+            view.setVisibility(View.VISIBLE);
+            view.animate().translationY(baseY).setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .setDuration((long) (slideMs * Math.min(1f, -partFrom / height))).start();
+        } else if (drop) {
             view.setAlpha(1f);
             view.setTranslationY(baseY - Math.max(1, params.height));
             view.setVisibility(View.VISIBLE);
-            view.animate().translationY(baseY).setInterpolator(EASE)
+            // Landscape hears the bar ~0.3 s ahead, portrait only just ahead: there the date has to
+            // start fast to keep up with a bar already on its way (both measured on recordings).
+            view.animate().translationY(baseY).setInterpolator(landscape() ? EASE : DROP)
                     .setDuration(prefs.getInt(Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS)).start();
         } else if (unlockFade || (hiddenByClock && statusBarVisible && !predictShown)) {
             // After unlock (~0.33 s) and back from recents (~0.25 s) the system clock fades in at an

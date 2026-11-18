@@ -116,6 +116,7 @@ public class SettingsActivity extends Activity {
         section("애니메이션과 타이밍", "단위는 ms입니다.");
         number("전체 화면에서 내려오는 시간", "0이면 페이드", Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS, 10, false);
         number("전체 화면으로 올라가는 시간", "0이면 페이드", Prefs.BAR_HIDE_MS, Prefs.DEF_BAR_HIDE_MS, 10, false);
+        number("분할 화면에서 내려오는 시간", "상단 바가 늦게 알려질 때. 0이면 바로 나타남", Prefs.LATE_DROP_MS, Prefs.DEF_LATE_DROP_MS, 10, false);
         number("나타날 때 페이드", null, Prefs.FADE_IN, Prefs.DEF_FADE_IN, 10, false);
         number("사라질 때 페이드", null, Prefs.FADE_OUT, Prefs.DEF_FADE_OUT, 10, false);
         number("앱 위 회전 중 계속 표시", "0이면 회전할 때 숨김", Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE, 100, false);

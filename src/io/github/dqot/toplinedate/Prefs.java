@@ -38,6 +38,7 @@ final class Prefs {
     static final String SLIDE_BACK_MS = "slideBackMs";     // move back when they go
     static final String BAR_SLIDE_MS = "barSlideMs";       // drop in from above after fullscreen
     static final String BAR_HIDE_MS = "barHideMs";         // slide up into the top edge on fullscreen
+    static final String LATE_DROP_MS = "lateDropMs";       // the bar seen only once down (split screen)
     static final String FADE_IN = "fadeIn";
     static final String FADE_OUT = "fadeOut";
     static final String ROTATE_GRACE = "rotateGrace";      // stay up through a rotation over an app
@@ -50,6 +51,7 @@ final class Prefs {
     static final int DEF_SLIDE_BACK_MS = 100;
     static final int DEF_BAR_SLIDE_MS = 220;
     static final int DEF_BAR_HIDE_MS = 140;
+    static final int DEF_LATE_DROP_MS = 80;
     static final int DEF_FADE_IN = 60;
     static final int DEF_FADE_OUT = 120;
     static final int DEF_ROTATE_GRACE = 1500;
