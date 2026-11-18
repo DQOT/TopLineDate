@@ -22,6 +22,7 @@ final class FullscreenRotator {
     private static final String TAG = DateService.TAG;
     static final long SETTLE_MS = 1500;   // the bar comes and goes while the screen turns
     private static final long QUIET_MS = 1200;
+    private static final long STALE_WAIT_MS = 2000;
 
     private final Context context;
     private final SharedPreferences prefs;
@@ -33,6 +34,7 @@ final class FullscreenRotator {
     private long lockedAt;
     private long releasedAt = -10_000;
     private int rotation;
+    private long staleSince;   // a lock left by an earlier run, not yet put back or taken over
     private OrientationEventListener tilt;
 
     FullscreenRotator(Context context, SharedPreferences prefs) {
@@ -68,7 +70,25 @@ final class FullscreenRotator {
         if (locked || !enabled() || pkg.isEmpty() || !Prefs.labApps(prefs).contains(pkg)) return;
         if (SystemClock.uptimeMillis() - releasedAt < QUIET_MS || !canWrite(context)) return;
         ContentResolver cr = context.getContentResolver();
+        if (staleSince != 0) {
+            // Restarted (an update) while that very app is still fullscreen: carry on with the
+            // lock already in place instead of turning the screen back and forth.
+            boolean same = pkg.equals(state.getString("app", ""));
+            staleSince = 0;
+            if (same) {
+                int now = display.getRotation();
+                rotation = now == Surface.ROTATION_90 || now == Surface.ROTATION_270 ? now : Surface.ROTATION_90;
+                locked = true;
+                app = pkg;
+                lockedAt = SystemClock.uptimeMillis();
+                startTilt();
+                Log.i(TAG, "labs: kept the landscape lock for " + pkg);
+                return;
+            }
+            restoreSaved();
+        }
         state.edit()
+                .putString("app", pkg)
                 .putBoolean("locked", true)
                 .putInt("accel", Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 1))
                 .putInt("userRot", Settings.System.getInt(cr, Settings.System.USER_ROTATION, Surface.ROTATION_0))
@@ -96,9 +116,20 @@ final class FullscreenRotator {
         Log.i(TAG, "labs: rotation back (" + why + ")");
     }
 
-    /** After a crash or a kill while locked, the user's settings are still saved: put them back. */
+    /**
+     * After a crash, a kill or an update while locked, the user's settings are still saved. The
+     * same app may still be fullscreen (onFullscreen takes the lock over); otherwise put them back
+     * on the first check that says so, or after a moment.
+     */
     void restoreIfStale() {
-        if (state.getBoolean("locked", false)) {
+        if (state.getBoolean("locked", false)) staleSince = SystemClock.uptimeMillis();
+    }
+
+    /** Called on every status check: settles a lock left by an earlier run. */
+    void settleStale(boolean barListed) {
+        if (staleSince == 0) return;
+        if (barListed || SystemClock.uptimeMillis() - staleSince > STALE_WAIT_MS) {
+            staleSince = 0;
             Log.i(TAG, "labs: restoring rotation left by an earlier run");
             restoreSaved();
         }

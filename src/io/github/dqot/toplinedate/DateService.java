@@ -651,7 +651,9 @@ public class DateService extends AccessibilityService
 
     /** Labs: end the landscape lock when fullscreen ends, the app changes or the screen locks. */
     private void checkRotator(boolean barListed) {
-        if (rotator == null || !rotator.locked()) return;
+        if (rotator == null) return;
+        rotator.settleStale(barListed);
+        if (!rotator.locked()) return;
         if (!power.isInteractive() || keyguard.isKeyguardLocked()) {
             rotator.release("화면 꺼짐");
         } else if (!rotator.settling()) {
