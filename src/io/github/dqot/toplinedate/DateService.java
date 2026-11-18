@@ -53,12 +53,16 @@ import java.util.regex.Pattern;
  * the clock and the icons right after it. In colour "auto" mode it also takes a screenshot on app
  * switches and looks at the brightness of the bar strip. Nothing is stored or sent anywhere.
  *
- * The key observations it relies on (ColorOS 17, OPPO Pad mini):
+ * The key observations it relies on (ColorOS 17, OPPO Pad mini; timings from screen recordings):
  * - The bar is a full-width TYPE_SYSTEM window at the top; it leaves the window list in fullscreen
- *   and is replaced by a tall window for the shade and lock screen.
- * - SystemUI marks its clock invisible when it hides it (recents, fullscreen entry, unlock), which
- *   is the earliest signal for hiding; leaving fullscreen, SystemUI stirs ~0.3 s before the bar is
- *   listed again, which is used to show early.
+ *   and is replaced by a tall window for the shade and lock screen. In split screen it stays
+ *   listed and slides (top < 0), and the list catches up late.
+ * - SystemUI marks its clock invisible when it hides it (recents, unlock).
+ * - The app's window handle (a window-control window) relays out ~30 ms before the bar slides up
+ *   into fullscreen and stirs 0.2-0.3 s before it comes back; the keyboard and the gesture area
+ *   stir it too and are told apart.
+ * - Mid-transition (an app opening or closing into a rotation) the bar drops out of the list
+ *   while it stays on screen.
  * - The whole bar shifts by a pixel a minute (burn-in protection), equally in both orientations.
  */
 public class DateService extends AccessibilityService
@@ -74,6 +78,8 @@ public class DateService extends AccessibilityService
     private static final android.view.animation.Interpolator ACCEL = new android.view.animation.AccelerateInterpolator();
     // The bar drops in fast and settles slowly.
     private static final android.view.animation.Interpolator DROP = new android.view.animation.DecelerateInterpolator(1.5f);
+    private static final android.view.animation.Interpolator DECEL = new android.view.animation.DecelerateInterpolator();
+    private static final android.view.animation.Interpolator LINEAR = new android.view.animation.LinearInterpolator();
     private static final Pattern TIME = Pattern.compile("^[ ]*[0-9]{1,2}[ ]*[:.][ ]*[0-9]{2}.*");
 
     private static volatile String lastStatus = "not connected";
@@ -160,6 +166,9 @@ public class DateService extends AccessibilityService
     private long barListedAt;
     private long handleStirAt;
     private long appShownAt;
+    private final HashSet<String> keyboards = new HashSet<>();
+    private long keyboardsAt = -60_000;
+    private String textKey = "";                    // what the text was last formatted for
     private static final long MENU_WAIT_MS = 60;
     private static final long MENU_GAP_MS = 120;
     private long barPendingSince;                   // the bar left the list in a transition
@@ -169,6 +178,7 @@ public class DateService extends AccessibilityService
         checkStatusBar();
     };
     private final Runnable sampler = this::sampleBar;
+    private final Runnable pendingCheck = this::checkStatusBar;
     private long pollUntil;
     private final Runnable clockPoll = new Runnable() {
         @Override
@@ -374,16 +384,12 @@ public class DateService extends AccessibilityService
 
         // While the clock is hidden, any activity may mean it is back: SystemUI reports that late,
         // so look right away and keep looking briefly after a screen change.
-        if (!clockVisible && statusBarVisible) {
-            quickClockCheck();
-            if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) startClockPoll();
-        }
-
-        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-            if (!fromSystemUi) return;   // only the bar's own changes matter
-            quickClockCheck();           // one call: is the system clock still shown?
-            needClock = true;            // icons next to the clock may have changed
-        }
+        boolean content = type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
+        if (content && !fromSystemUi) return;   // only the bar's own changes matter
+        boolean waiting = !clockVisible && statusBarVisible;
+        if (content || waiting) quickClockCheck();   // one call: is the system clock shown?
+        if (waiting && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) startClockPoll();
+        if (content) needClock = true;               // icons next to the clock may have changed
 
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && pkg != null && !fromSystemUi) {
             CharSequence cls = event.getClassName();
@@ -399,13 +405,15 @@ public class DateService extends AccessibilityService
 
         // A touch on the gesture area stirs the handle window without a source first, then relays it
         // out like fullscreen does; fullscreen has no such stir.
-        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && fromSystemUi && event.getSource() == null
-                && event.getWindowId() != barWindowId) {
+        // (The bar's own changes - clock, icons - are most of them: skip those before any lookup.)
+        boolean handleEvent = type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && fromSystemUi
+                && event.getWindowId() != barWindowId;
+        if (handleEvent && event.getSource() == null) {
             handleStirAt = SystemClock.uptimeMillis();
         }
         // Entering fullscreen: the app's window handle relays out ~30 ms before the clock slides up,
         // while the bar can stay listed until 0.3 s after the clock is gone.
-        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && fromSystemUi && statusBarVisible
+        if (handleEvent && statusBarVisible
                 && shown && !predictHidden && !barExpanded && !menuOverlay && screenOn && unlocked
                 && SystemClock.uptimeMillis() - lastConfigAt > 1500
                 && SystemClock.uptimeMillis() >= rotationGraceUntil
@@ -459,12 +467,18 @@ public class DateService extends AccessibilityService
 
     /** Keyboards announce their window like an app does (and not always from a listed window). */
     private boolean isKeyboard(String pkg) {
-        android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
-        if (imm == null) return false;
-        for (android.view.inputmethod.InputMethodInfo info : imm.getEnabledInputMethodList()) {
-            if (info.getPackageName().equals(pkg)) return true;
+        long now = SystemClock.uptimeMillis();
+        if (now - keyboardsAt > 60_000) {   // an IPC: not on every app window event
+            keyboards.clear();
+            android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
+            if (imm != null) {
+                for (android.view.inputmethod.InputMethodInfo info : imm.getEnabledInputMethodList()) {
+                    keyboards.add(info.getPackageName());
+                }
+            }
+            keyboardsAt = now;
         }
-        return false;
+        return keyboards.contains(pkg);
     }
 
     /** The whole-screen root of an app's window handle (a window-control window) laid out again. */
@@ -573,7 +587,8 @@ public class DateService extends AccessibilityService
             if (between || LAUNCHER.equals(focusedAppPackage())) {
                 if (barPendingSince == 0) barPendingSince = now;
                 if (now - barPendingSince < BAR_PENDING_MAX) {
-                    recheckIn(100);
+                    handler.removeCallbacks(pendingCheck);   // one follow-up, not one per event
+                    handler.postDelayed(pendingCheck, 100);
                     return;
                 }
             }
@@ -590,6 +605,7 @@ public class DateService extends AccessibilityService
             w.getBoundsInScreen(b);
             if (b.isEmpty() || (b.top == 0 && b.height() <= barHeight * 2)) shadeIds.add(w.getId());
         }
+        if (shadeIds.size() > 64) shadeIds.clear();   // menus get new ids; keep the set small
 
         // A floating window's menu: the list shrinks to one focused full-screen system window
         // (a new one each time) while the real bar and clock stay on screen behind it.
@@ -942,7 +958,7 @@ public class DateService extends AccessibilityService
                     float height = Math.max(1, params.height);
                     float done = dropFrom < 0 ? Math.min(1f, -dropFrom / height) : 0f;
                     if (done > 0) view.setTranslationY(fineY() + dropFrom);
-                    view.animate().translationY(fineY() - height).setInterpolator(done > 0 ? new android.view.animation.LinearInterpolator() : ACCEL)
+                    view.animate().translationY(fineY() - height).setInterpolator(done > 0 ? LINEAR : ACCEL)
                             .setDuration((long) (upMs * (1f - done) + 0.5f))
                             .withEndAction(() -> { if (!shown) view.setVisibility(View.INVISIBLE); }).start();
                 } else {
@@ -971,7 +987,7 @@ public class DateService extends AccessibilityService
             view.setAlpha(1f);
             view.setTranslationY(baseY - height);
             view.setVisibility(View.VISIBLE);
-            view.animate().translationY(baseY).setInterpolator(new android.view.animation.DecelerateInterpolator())
+            view.animate().translationY(baseY).setInterpolator(DECEL)
                     .setDuration(lateMs).start();
         } else if (!drop && partFrom < 0 && slideMs > 0) {
             // Seen late, part-way down (split screen): only the rest of the way, at the bar's pace.
@@ -979,7 +995,7 @@ public class DateService extends AccessibilityService
             view.setAlpha(1f);
             view.setTranslationY(baseY + partFrom);
             view.setVisibility(View.VISIBLE);
-            view.animate().translationY(baseY).setInterpolator(new android.view.animation.DecelerateInterpolator())
+            view.animate().translationY(baseY).setInterpolator(DECEL)
                     .setDuration((long) (slideMs * Math.min(1f, -partFrom / height))).start();
         } else if (drop) {
             view.setAlpha(1f);
@@ -995,7 +1011,7 @@ public class DateService extends AccessibilityService
             view.setTranslationY(baseY);
             view.setAlpha(0f);
             view.setVisibility(View.VISIBLE);
-            view.animate().alpha(1f).setInterpolator(new android.view.animation.LinearInterpolator())
+            view.animate().alpha(1f).setInterpolator(LINEAR)
                     .setDuration(unlockFade ? prefs.getInt(Prefs.UNLOCK_FADE_MS, Prefs.DEF_UNLOCK_FADE_MS)
                             : prefs.getInt(Prefs.CLOCK_BACK_FADE_MS, Prefs.DEF_CLOCK_BACK_FADE_MS)).start();
         } else {
@@ -1041,8 +1057,13 @@ public class DateService extends AccessibilityService
         if (shown) view.setTranslationY(fineY());
     }
 
+    /** Runs on every check, so it formats only when the minute, pattern, locale or zone changed. */
     private void updateText() {
         String pattern = prefs.getString(Prefs.FORMAT, Prefs.DEF_FORMAT);
+        String key = pattern + "|" + (System.currentTimeMillis() / 60_000) + "|" + Locale.getDefault()
+                + "|" + java.util.TimeZone.getDefault().getID();
+        if (key.equals(textKey)) return;
+        textKey = key;
         String text;
         try {
             text = new SimpleDateFormat(pattern, Locale.getDefault()).format(new Date());
@@ -1138,10 +1159,6 @@ public class DateService extends AccessibilityService
         AccessibilityNodeInfo root = pick == null ? null : pick.getRoot();
         CharSequence pkg = root == null ? null : root.getPackageName();
         return pkg == null ? "" : pkg.toString();
-    }
-
-    private boolean isHome() {
-        return foreground.isEmpty() || foreground.equals(LAUNCHER);
     }
 
     private boolean landscape() {

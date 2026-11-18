@@ -119,8 +119,8 @@ public class SettingsActivity extends Activity {
         number("분할 화면에서 내려오는 시간", "상단 바가 늦게 알려질 때. 0이면 바로 나타남", Prefs.LATE_DROP_MS, Prefs.DEF_LATE_DROP_MS, 10, false);
         number("나타날 때 페이드", null, Prefs.FADE_IN, Prefs.DEF_FADE_IN, 10, false);
         number("사라질 때 페이드", null, Prefs.FADE_OUT, Prefs.DEF_FADE_OUT, 10, false);
-        number("앱 위 회전 중 계속 표시", "0이면 회전할 때 숨김", Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE, 100, false);
-        number("앱 위 회전 후 대기", "계속 표시를 0으로 했을 때", Prefs.ROTATE_DELAY, Prefs.DEF_ROTATE_DELAY, 10, false);
+        number("회전 중 계속 표시", "0이면 회전할 때 숨김", Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE, 100, false);
+        number("회전 후 대기", "계속 표시를 0으로 했을 때", Prefs.ROTATE_DELAY, Prefs.DEF_ROTATE_DELAY, 10, false);
         number("최근 앱에서 돌아올 때 나타나는 시간", "시계처럼 일정한 속도로 밝아집니다",
                 Prefs.CLOCK_BACK_FADE_MS, Prefs.DEF_CLOCK_BACK_FADE_MS, 10, false);
         number("잠금 해제 후 시계 뒤 대기", "잠금 해제 후 시계가 다시 보인 뒤 이만큼 있다가 나타납니다",

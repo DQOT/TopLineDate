@@ -41,7 +41,7 @@ final class Prefs {
     static final String LATE_DROP_MS = "lateDropMs";       // the bar seen only once down (split screen)
     static final String FADE_IN = "fadeIn";
     static final String FADE_OUT = "fadeOut";
-    static final String ROTATE_GRACE = "rotateGrace";      // stay up through a rotation over an app
+    static final String ROTATE_GRACE = "rotateGrace";      // stay up through a rotation
     static final String ROTATE_DELAY = "rotateDelay";      // wait after a rotation when grace is 0
     static final String AFTER_CLOCK_MS = "afterClockMs";   // after unlock: wait this long once the clock shows
     static final String CLOCK_BACK_FADE_MS = "clockBackFadeMs"; // the clock shows again (back from recents)
@@ -52,8 +52,8 @@ final class Prefs {
     static final int DEF_BAR_SLIDE_MS = 220;
     static final int DEF_BAR_HIDE_MS = 140;
     static final int DEF_LATE_DROP_MS = 80;
-    static final int DEF_FADE_IN = 60;
-    static final int DEF_FADE_OUT = 120;
+    static final int DEF_FADE_IN = 90;
+    static final int DEF_FADE_OUT = 0;      // hide signals come late: vanish at once
     static final int DEF_ROTATE_GRACE = 1500;
     static final int DEF_ROTATE_DELAY = 0;
     static final int DEF_AFTER_CLOCK_MS = 0;
