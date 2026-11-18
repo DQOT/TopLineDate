@@ -71,6 +71,7 @@ public class DateService extends AccessibilityService
     private static final int DARK_TEXT = 0xCC000000;   // the ColorOS clock is 80% alpha
     private static final int LIGHT_TEXT = 0xCCFFFFFF;
     private static final PathInterpolator EASE = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
+    private static final android.view.animation.Interpolator ACCEL = new android.view.animation.AccelerateInterpolator();
     private static final Pattern TIME = Pattern.compile("^[ ]*[0-9]{1,2}[ ]*[:.][ ]*[0-9]{2}.*");
 
     private static volatile String lastStatus = "not connected";
@@ -104,6 +105,11 @@ public class DateService extends AccessibilityService
     private boolean floatingSeen;                   // a floating app window was on screen
     private final HashSet<Integer> shadeIds = new HashSet<>();
     private long barGoneSince;
+    private boolean unlockWaiting;                  // after unlock: until the clock shows
+    private boolean unlockFade;                     // the next show fades in like the clock
+    private boolean hiddenByClock;                  // hidden while the bar stayed (recents)
+    private static final long UNLOCK_CLOCK_TIMEOUT = 1500;
+
     private long lastConfigAt = -10_000;
 
     // ---- clock and anchor ---------------------------------------------------------------------
@@ -141,6 +147,11 @@ public class DateService extends AccessibilityService
 
     private final Runnable clearPredictShow = () -> {
         predictShown = false;
+        checkStatusBar();
+    };
+    private boolean predictHidden;
+    private final Runnable clearPredictHide = () -> {
+        predictHidden = false;
         checkStatusBar();
     };
     private final Runnable sampler = this::sampleBar;
@@ -369,6 +380,18 @@ public class DateService extends AccessibilityService
             if (!ownOverlay && (cls == null || !cls.toString().contains("Toast"))) onAppShown(pkg.toString());
         }
 
+        // Entering fullscreen: the app's window handle relays out ~30 ms before the clock slides up,
+        // while the bar can stay listed until 0.3 s after the clock is gone.
+        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && fromSystemUi && statusBarVisible
+                && shown && !predictHidden && !barExpanded && !menuOverlay && screenOn && unlocked
+                && SystemClock.uptimeMillis() - lastConfigAt > 1500
+                && SystemClock.uptimeMillis() >= rotationGraceUntil && isHandleRelayout(event)) {
+            Log.i(TAG, "predict-hide");
+            predictHidden = true;
+            handler.removeCallbacks(clearPredictHide);
+            handler.postDelayed(clearPredictHide, 600);   // undone unless the bar leaves
+        }
+
         // Leaving fullscreen: SystemUI stirs ~0.3 s before the bar is listed again. A rotation
         // stirs it too while staying fullscreen, so not right after one.
         long now = SystemClock.uptimeMillis();
@@ -404,6 +427,20 @@ public class DateService extends AccessibilityService
         int screenWidth = windowManager.getCurrentWindowMetrics().getBounds().width();
         return r.top <= 2 && Math.abs(r.height() - barHeight) <= 6 && r.width() > 0
                 && r.width() < screenWidth * 0.2f;
+    }
+
+    /** The whole-screen root of an app's window handle (a window-control window) laid out again. */
+    private boolean isHandleRelayout(AccessibilityEvent event) {
+        AccessibilityNodeInfo src = event.getSource();
+        if (src == null || src.getParent() != null) return false;
+        Rect r = new Rect();
+        src.getBoundsInScreen(r);
+        Rect screen = windowManager.getCurrentWindowMetrics().getBounds();
+        if (r.top > 0 || r.height() < screen.height() * 0.9f || r.width() < screen.width() * 0.9f) return false;
+        for (AccessibilityWindowInfo w : getWindows()) {
+            if (w.getId() == event.getWindowId()) return w.getType() == 7;   // TYPE_WINDOW_CONTROL
+        }
+        return false;
     }
 
     private String windowSummary() {
@@ -482,9 +519,12 @@ public class DateService extends AccessibilityService
             Log.i(TAG, "menu overlay=" + overlay);
         }
         barExpanded = expanded && !found && !menuOverlay;
+        if (barExpanded || menuOverlay) hiddenByClock = false;   // the shade, not recents
 
         // Back from the shade or the menu: the clock flickers in the a11y tree while it settles.
-        if (found && (wasOverlay || (!statusBarVisible && wasExpanded))) {
+        // (Not after the lock screen: there the clock is really hidden for a while, and the date
+        // waits for it - see onBarListedChanged.)
+        if (found && (wasOverlay || (!statusBarVisible && wasExpanded && !wasLocked))) {
             clockVisible = true;
             settleUntil = SystemClock.uptimeMillis() + 500;
             needClock = true;
@@ -496,6 +536,9 @@ public class DateService extends AccessibilityService
         if (found) {
             predictShown = false;
             handler.removeCallbacks(clearPredictShow);
+        } else if (predictHidden) {
+            predictHidden = false;   // the bar did leave: from here on its absence keeps the date hidden
+            handler.removeCallbacks(clearPredictHide);
         }
         if (found != statusBarVisible) onBarListedChanged(found, expanded);
 
@@ -520,10 +563,17 @@ public class DateService extends AccessibilityService
 
     private void onBarListedChanged(boolean found, boolean expanded) {
         long now = SystemClock.uptimeMillis();
-        // Back from the lock screen: wait a little longer than the system clock does.
+        // Back from the lock screen: SystemUI keeps the clock hidden a while (about 0.2-0.3 s on
+        // the home screen, 0.45 s over an app). Appear a moment after the clock does.
         if (found && wasLocked) {
-            hold(isHome() ? prefs.getInt(Prefs.HOME_UNLOCK_DELAY, Prefs.DEF_HOME_UNLOCK_DELAY)
-                          : prefs.getInt(Prefs.UNLOCK_DELAY, Prefs.DEF_UNLOCK_DELAY));
+            unlockFade = true;
+            if (clockVisible) {
+                hold(prefs.getInt(Prefs.AFTER_CLOCK_MS, Prefs.DEF_AFTER_CLOCK_MS));
+            } else {
+                unlockWaiting = true;
+                holdUntil = now + UNLOCK_CLOCK_TIMEOUT;   // in case the clock is never reported
+                recheckIn(UNLOCK_CLOCK_TIMEOUT + 5);
+            }
         }
         statusBarVisible = found;
         if (found) {
@@ -618,6 +668,14 @@ public class DateService extends AccessibilityService
         if (visible == clockVisible) return;
         clockVisible = visible;
         Log.i(TAG, "clock visible=" + visible);
+        if (visible && unlockWaiting) {
+            // Replace the safety timeout with "a moment after the clock" (0 means at once).
+            unlockWaiting = false;
+            unlockFade = true;
+            int ms = Math.max(0, prefs.getInt(Prefs.AFTER_CLOCK_MS, Prefs.DEF_AFTER_CLOCK_MS));
+            holdUntil = SystemClock.uptimeMillis() + ms;
+            recheckIn(ms + 5);
+        }
         if (now) refreshVisibility();
         else handler.post(this::refreshVisibility);
     }
@@ -736,7 +794,7 @@ public class DateService extends AccessibilityService
                 || (rotating && !barExpanded)
                 || (!prefs.getBoolean(Prefs.HIDE_FULLSCREEN, Prefs.DEF_HIDE_FULLSCREEN) && !barExpanded);
         return prefs.getBoolean(Prefs.ENABLED, Prefs.DEF_ENABLED)
-                && screenOn && unlocked && now >= holdUntil
+                && screenOn && unlocked && now >= holdUntil && !predictHidden
                 && !(clockHidden && prefs.getBoolean(Prefs.HIDE_RECENTS, Prefs.DEF_HIDE_RECENTS))
                 && barUp;
     }
@@ -756,12 +814,23 @@ public class DateService extends AccessibilityService
                         && focusedAppPackage().equals(fullscreenApp);
                 showNow(drop);
             } else if (screenOn) {
-                // The system clock just vanishes on fullscreen entry, so the date fades too.
                 hiddenAt = SystemClock.uptimeMillis();
-                view.animate().alpha(0f).setDuration(prefs.getInt(Prefs.FADE_OUT, Prefs.DEF_FADE_OUT))
-                        .withEndAction(() -> { if (!shown) view.setVisibility(View.INVISIBLE); }).start();
+                hiddenByClock = statusBarVisible && !clockVisible && !predictHidden;
+                int upMs = prefs.getInt(Prefs.BAR_HIDE_MS, Prefs.DEF_BAR_HIDE_MS);
+                boolean up = upMs > 0 && unlocked && !barExpanded && !menuOverlay
+                        && (predictHidden || (!statusBarVisible && hiddenAt >= rotationGraceUntil));
+                if (up) {
+                    // Into fullscreen the clock slides up into the top edge, speeding up: follow it.
+                    view.animate().translationY(fineY() - Math.max(1, params.height)).setInterpolator(ACCEL)
+                            .setDuration(upMs)
+                            .withEndAction(() -> { if (!shown) view.setVisibility(View.INVISIBLE); }).start();
+                } else {
+                    view.animate().alpha(0f).setInterpolator(null).setDuration(prefs.getInt(Prefs.FADE_OUT, Prefs.DEF_FADE_OUT))
+                            .withEndAction(() -> { if (!shown) view.setVisibility(View.INVISIBLE); }).start();
+                }
             } else {
                 fromFullscreen = false;
+                hiddenByClock = false;
                 view.setAlpha(0f);
                 view.setVisibility(View.INVISIBLE);
             }
@@ -777,14 +846,26 @@ public class DateService extends AccessibilityService
             view.setVisibility(View.VISIBLE);
             view.animate().translationY(baseY).setInterpolator(EASE)
                     .setDuration(prefs.getInt(Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS)).start();
+        } else if (unlockFade || (hiddenByClock && statusBarVisible && !predictShown)) {
+            // After unlock (~0.33 s) and back from recents (~0.25 s) the system clock fades in at an
+            // even pace: match it.
+            view.setTranslationY(baseY);
+            view.setAlpha(0f);
+            view.setVisibility(View.VISIBLE);
+            view.animate().alpha(1f).setInterpolator(new android.view.animation.LinearInterpolator())
+                    .setDuration(unlockFade ? prefs.getInt(Prefs.UNLOCK_FADE_MS, Prefs.DEF_UNLOCK_FADE_MS)
+                            : prefs.getInt(Prefs.CLOCK_BACK_FADE_MS, Prefs.DEF_CLOCK_BACK_FADE_MS)).start();
         } else {
             view.setTranslationY(baseY);
             if (view.getVisibility() != View.VISIBLE) {
                 view.setAlpha(0f);
                 view.setVisibility(View.VISIBLE);
             }
-            view.animate().alpha(1f).setDuration(prefs.getInt(Prefs.FADE_IN, Prefs.DEF_FADE_IN)).start();
+            view.animate().alpha(1f).setInterpolator(null)   // default curve (the animator keeps the last one)
+                    .setDuration(prefs.getInt(Prefs.FADE_IN, Prefs.DEF_FADE_IN)).start();
         }
+        unlockFade = false;
+        hiddenByClock = false;
         fromFullscreen = false;
         scheduleSample(150);   // the background may have changed while hidden
     }

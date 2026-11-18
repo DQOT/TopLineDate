@@ -37,22 +37,26 @@ final class Prefs {
     static final String SLIDE_MS = "slideMs";              // move right when icons appear
     static final String SLIDE_BACK_MS = "slideBackMs";     // move back when they go
     static final String BAR_SLIDE_MS = "barSlideMs";       // drop in from above after fullscreen
+    static final String BAR_HIDE_MS = "barHideMs";         // slide up into the top edge on fullscreen
     static final String FADE_IN = "fadeIn";
     static final String FADE_OUT = "fadeOut";
     static final String ROTATE_GRACE = "rotateGrace";      // stay up through a rotation over an app
     static final String ROTATE_DELAY = "rotateDelay";      // wait after a rotation when grace is 0
-    static final String UNLOCK_DELAY = "unlockDelay";      // wait after unlocking over an app
-    static final String HOME_UNLOCK_DELAY = "homeUnlockDelay"; // same, on the home screen
+    static final String AFTER_CLOCK_MS = "afterClockMs";   // after unlock: wait this long once the clock shows
+    static final String CLOCK_BACK_FADE_MS = "clockBackFadeMs"; // the clock shows again (back from recents)
+    static final String UNLOCK_FADE_MS = "unlockFadeMs";   // after unlock: fade in this long (the clock takes ~0.33 s)
 
     static final int DEF_SLIDE_MS = 100;
     static final int DEF_SLIDE_BACK_MS = 100;
     static final int DEF_BAR_SLIDE_MS = 220;
+    static final int DEF_BAR_HIDE_MS = 140;
     static final int DEF_FADE_IN = 60;
     static final int DEF_FADE_OUT = 120;
     static final int DEF_ROTATE_GRACE = 1500;
     static final int DEF_ROTATE_DELAY = 0;
-    static final int DEF_UNLOCK_DELAY = 520;
-    static final int DEF_HOME_UNLOCK_DELAY = 320;
+    static final int DEF_AFTER_CLOCK_MS = 0;
+    static final int DEF_UNLOCK_FADE_MS = 280;
+    static final int DEF_CLOCK_BACK_FADE_MS = 250;
 
     // ---- size and placement, per display size --------------------------------------------------
     static final String ANCHOR = "anchor";                 // boolean: follow the status bar clock
@@ -90,7 +94,7 @@ final class Prefs {
 
     /** Keys from earlier versions, removed on start. */
     static final String[] OBSOLETE_KEYS = {"predictHide", "dropDecideMs", "probe", "probe2",
-            "probe4", SIZE, GAP, GAP_ICONS, PORTRAIT_Y, LANDSCAPE_Y, FINE_Y_PORTRAIT,
+            "probe4", "unlockDelay", "homeUnlockDelay", "headsup", SIZE, GAP, GAP_ICONS, PORTRAIT_Y, LANDSCAPE_Y, FINE_Y_PORTRAIT,
             FINE_Y_LANDSCAPE, PORTRAIT_X, LANDSCAPE_X};
 
     private Prefs() {}
