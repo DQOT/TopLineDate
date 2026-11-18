@@ -377,7 +377,10 @@ public class DateService extends AccessibilityService
             // itself when shown; neither is an app coming to the front.
             boolean ownOverlay = pkg.toString().equals(getPackageName())
                     && (cls == null || !cls.toString().contains("SettingsActivity"));
-            if (!ownOverlay && (cls == null || !cls.toString().contains("Toast"))) onAppShown(pkg.toString());
+            if (!ownOverlay && (cls == null || !cls.toString().contains("Toast"))
+                    && !isKeyboard(pkg.toString())) {
+                onAppShown(pkg.toString());   // the keyboard is not an app coming to the front
+            }
         }
 
         // Entering fullscreen: the app's window handle relays out ~30 ms before the clock slides up,
@@ -429,6 +432,16 @@ public class DateService extends AccessibilityService
                 && r.width() < screenWidth * 0.2f;
     }
 
+    /** Keyboards announce their window like an app does (and not always from a listed window). */
+    private boolean isKeyboard(String pkg) {
+        android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
+        if (imm == null) return false;
+        for (android.view.inputmethod.InputMethodInfo info : imm.getEnabledInputMethodList()) {
+            if (info.getPackageName().equals(pkg)) return true;
+        }
+        return false;
+    }
+
     /** The whole-screen root of an app's window handle (a window-control window) laid out again. */
     private boolean isHandleRelayout(AccessibilityEvent event) {
         AccessibilityNodeInfo src = event.getSource();
@@ -437,10 +450,13 @@ public class DateService extends AccessibilityService
         src.getBoundsInScreen(r);
         Rect screen = windowManager.getCurrentWindowMetrics().getBounds();
         if (r.top > 0 || r.height() < screen.height() * 0.9f || r.width() < screen.width() * 0.9f) return false;
+        // The keyboard coming or going relays it out the same way; its window is listed by then.
+        boolean handle = false;
         for (AccessibilityWindowInfo w : getWindows()) {
-            if (w.getId() == event.getWindowId()) return w.getType() == 7;   // TYPE_WINDOW_CONTROL
+            if (w.getType() == AccessibilityWindowInfo.TYPE_INPUT_METHOD) return false;
+            if (w.getId() == event.getWindowId()) handle = w.getType() == 7;   // TYPE_WINDOW_CONTROL
         }
-        return false;
+        return handle;
     }
 
     private String windowSummary() {
