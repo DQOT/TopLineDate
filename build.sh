@@ -42,17 +42,18 @@ KEYSTORE="$HERE/keys/release.jks"
 PASS="${KEYSTORE_PASSWORD:-toplinedate}"
 
 rm -rf "$OUT"
-mkdir -p "$OUT/classes" "$OUT/dex" "$HERE/keys"
+mkdir -p "$OUT/classes" "$OUT/dex" "$OUT/gen" "$HERE/keys"
 
 echo "== resources"
 "$AAPT2" compile --dir "$HERE/res" -o "$OUT/res.zip"
 "$AAPT2" link -o "$OUT/base.apk" -I "$ANDROID_JAR" \
     --manifest "$HERE/AndroidManifest.xml" \
     --min-sdk-version 30 --target-sdk-version 36 \
+    --java "$OUT/gen" \
     "$OUT/res.zip"
 
 echo "== java"
-find "$HERE/src" -name '*.java' | winpath > "$OUT/sources.txt"
+{ find "$HERE/src" -name '*.java'; find "$OUT/gen" -name '*.java'; } | winpath > "$OUT/sources.txt"
 "$JAVAC" --release 17 -encoding UTF-8 -Xlint:-options -nowarn \
     -classpath "$ANDROID_JAR" -d "$OUT/classes" @"$OUT/sources.txt"
 

@@ -77,60 +77,59 @@ public class SettingsActivity extends Activity {
             return;
         }
 
-        section("앱 유지", "최근 앱 모두 닫기에 꺼지지 않게 하려면, 최근 앱 화면에서 이 앱 카드를 잠근 뒤 "
-                + "'최근 앱에 표시'를 끄세요. 잠금은 유지되고 카드만 숨겨집니다.");
-        toggle("최근 앱에 표시", null, Prefs.SHOW_IN_RECENTS, true, this::applyRecents);
+        section(getString(R.string.section_keep_app), getString(R.string.section_keep_app_help));
+        toggle(getString(R.string.show_in_recents), null, Prefs.SHOW_IN_RECENTS, true, this::applyRecents);
 
-        section("표시", null);
-        toggle("날짜 표시", null, Prefs.ENABLED, Prefs.DEF_ENABLED, null);
-        text("형식", "예: M월 d일 EEEE, M/d E, M.d (E)", Prefs.FORMAT, Prefs.DEF_FORMAT);
-        text("글자 색", "auto 또는 #RRGGBB. auto는 상단 바 밝기에 맞춰 바뀝니다.", Prefs.COLOR, Prefs.DEF_COLOR);
-        text("글꼴", "비우면 시스템 글꼴", Prefs.FONT, Prefs.DEF_FONT);
-        number("굵기", "100-900. 700이 시계 획 두께와 같습니다.", Prefs.WEIGHT, Prefs.DEF_WEIGHT, 100, false);
+        section(getString(R.string.section_display), null);
+        toggle(getString(R.string.show_date), null, Prefs.ENABLED, Prefs.DEF_ENABLED, null);
+        text(getString(R.string.format), getString(R.string.format_help), Prefs.FORMAT, Prefs.defFormat(this));
+        text(getString(R.string.text_color), getString(R.string.text_color_help), Prefs.COLOR, Prefs.DEF_COLOR);
+        text(getString(R.string.font), getString(R.string.font_help), Prefs.FONT, Prefs.DEF_FONT);
+        number(getString(R.string.weight), getString(R.string.weight_help), Prefs.WEIGHT, Prefs.DEF_WEIGHT, 100, false);
 
-        section("크기와 위치", "아래 값은 디스플레이 크기마다 따로 저장됩니다.");
+        section(getString(R.string.section_size_position), getString(R.string.section_size_position_help));
         profileChooser();
-        number("글자 크기", "px", Prefs.SIZE, 0, 0.5f, true);
-        number("시계와의 간격", "알림 표시가 없을 때, px", Prefs.GAP, 0, 1, false);
-        number("알림 표시와의 간격", "알림 표시가 있을 때, px", Prefs.GAP_ICONS, 0, 1, false);
-        number("세로 화면 높이", "px", Prefs.PORTRAIT_Y, 0, 1, false);
-        number("세로 화면 미세 높이", "px, 소수", Prefs.FINE_Y_PORTRAIT, 0, 0.25f, true);
-        number("가로 화면 높이", "px", Prefs.LANDSCAPE_Y, 0, 1, false);
-        number("가로 화면 미세 높이", "px, 소수", Prefs.FINE_Y_LANDSCAPE, 0, 0.25f, true);
-        toggle("시계 옆에 자동으로 붙이기", "끄면 아래 X 값으로 고정", Prefs.ANCHOR, Prefs.DEF_ANCHOR, null);
-        number("세로 화면 X", "자동 붙이기를 끈 경우, px", Prefs.PORTRAIT_X, 0, 1, false);
-        number("가로 화면 X", "자동 붙이기를 끈 경우, px", Prefs.LANDSCAPE_X, 0, 1, false);
+        number(getString(R.string.text_size), getString(R.string.unit_px), Prefs.SIZE, 0, 0.5f, true);
+        number(getString(R.string.gap_clock), getString(R.string.gap_clock_help), Prefs.GAP, 0, 1, false);
+        number(getString(R.string.gap_badge), getString(R.string.gap_badge_help), Prefs.GAP_ICONS, 0, 1, false);
+        number(getString(R.string.portrait_y), getString(R.string.unit_px), Prefs.PORTRAIT_Y, 0, 1, false);
+        number(getString(R.string.portrait_fine_y), getString(R.string.unit_px_decimal), Prefs.FINE_Y_PORTRAIT, 0, 0.25f, true);
+        number(getString(R.string.landscape_y), getString(R.string.unit_px), Prefs.LANDSCAPE_Y, 0, 1, false);
+        number(getString(R.string.landscape_fine_y), getString(R.string.unit_px_decimal), Prefs.FINE_Y_LANDSCAPE, 0, 0.25f, true);
+        toggle(getString(R.string.anchor), getString(R.string.anchor_help), Prefs.ANCHOR, Prefs.DEF_ANCHOR, null);
+        number(getString(R.string.portrait_x), getString(R.string.fixed_x_help), Prefs.PORTRAIT_X, 0, 1, false);
+        number(getString(R.string.landscape_x), getString(R.string.fixed_x_help), Prefs.LANDSCAPE_X, 0, 1, false);
 
-        section("알림 표시", "알림 표시가 생기거나 사라질 때 날짜가 옆으로 움직이는 속도입니다.");
+        section(getString(R.string.section_badge), getString(R.string.section_badge_help));
         testButtons();
-        number("생길 때 이동 시간", "ms, 0이면 바로 이동", Prefs.SLIDE_MS, Prefs.DEF_SLIDE_MS, 10, false);
-        number("사라질 때 이동 시간", "ms, 0이면 바로 이동", Prefs.SLIDE_BACK_MS, Prefs.DEF_SLIDE_BACK_MS, 10, false);
+        number(getString(R.string.slide_in), getString(R.string.slide_help), Prefs.SLIDE_MS, Prefs.DEF_SLIDE_MS, 10, false);
+        number(getString(R.string.slide_out), getString(R.string.slide_help), Prefs.SLIDE_BACK_MS, Prefs.DEF_SLIDE_BACK_MS, 10, false);
 
-        section("숨김", null);
-        toggle("전체 화면에서 숨기기", null, Prefs.HIDE_FULLSCREEN, Prefs.DEF_HIDE_FULLSCREEN, null);
-        toggle("시계가 숨으면 같이 숨기기", "최근 앱 화면, 전체 화면 진입, 잠금 해제 직후 등",
+        section(getString(R.string.section_hiding), null);
+        toggle(getString(R.string.hide_fullscreen), null, Prefs.HIDE_FULLSCREEN, Prefs.DEF_HIDE_FULLSCREEN, null);
+        toggle(getString(R.string.hide_with_clock), getString(R.string.hide_with_clock_help),
                 Prefs.HIDE_RECENTS, Prefs.DEF_HIDE_RECENTS, null);
-        toggle("전체 화면에서 나올 때 미리 표시", "상단 바보다 약 0.3초 먼저 나타납니다",
+        toggle(getString(R.string.predict), getString(R.string.predict_help),
                 Prefs.PREDICT, Prefs.DEF_PREDICT, null);
 
-        section("애니메이션과 타이밍", "단위는 ms입니다.");
-        number("전체 화면에서 내려오는 시간", "0이면 페이드", Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS, 10, false);
-        number("전체 화면으로 올라가는 시간", "0이면 페이드", Prefs.BAR_HIDE_MS, Prefs.DEF_BAR_HIDE_MS, 10, false);
-        number("분할 화면에서 내려오는 시간", "상단 바가 늦게 알려질 때. 0이면 바로 나타남", Prefs.LATE_DROP_MS, Prefs.DEF_LATE_DROP_MS, 10, false);
-        number("나타날 때 페이드", null, Prefs.FADE_IN, Prefs.DEF_FADE_IN, 10, false);
-        number("사라질 때 페이드", null, Prefs.FADE_OUT, Prefs.DEF_FADE_OUT, 10, false);
-        number("회전 중 계속 표시", "0이면 회전할 때 숨김", Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE, 100, false);
-        number("회전 후 대기", "계속 표시를 0으로 했을 때", Prefs.ROTATE_DELAY, Prefs.DEF_ROTATE_DELAY, 10, false);
-        number("최근 앱에서 돌아올 때 나타나는 시간", "시계처럼 일정한 속도로 밝아집니다",
+        section(getString(R.string.section_timing), getString(R.string.section_timing_help));
+        number(getString(R.string.bar_slide), getString(R.string.zero_fades_help), Prefs.BAR_SLIDE_MS, Prefs.DEF_BAR_SLIDE_MS, 10, false);
+        number(getString(R.string.bar_hide), getString(R.string.zero_fades_help), Prefs.BAR_HIDE_MS, Prefs.DEF_BAR_HIDE_MS, 10, false);
+        number(getString(R.string.late_drop), getString(R.string.late_drop_help), Prefs.LATE_DROP_MS, Prefs.DEF_LATE_DROP_MS, 10, false);
+        number(getString(R.string.fade_in), null, Prefs.FADE_IN, Prefs.DEF_FADE_IN, 10, false);
+        number(getString(R.string.fade_out), null, Prefs.FADE_OUT, Prefs.DEF_FADE_OUT, 10, false);
+        number(getString(R.string.rotate_grace), getString(R.string.rotate_grace_help), Prefs.ROTATE_GRACE, Prefs.DEF_ROTATE_GRACE, 100, false);
+        number(getString(R.string.rotate_delay), getString(R.string.rotate_delay_help), Prefs.ROTATE_DELAY, Prefs.DEF_ROTATE_DELAY, 10, false);
+        number(getString(R.string.clock_back_fade), getString(R.string.clock_like_fade_help),
                 Prefs.CLOCK_BACK_FADE_MS, Prefs.DEF_CLOCK_BACK_FADE_MS, 10, false);
-        number("잠금 해제 후 시계 뒤 대기", "잠금 해제 후 시계가 다시 보인 뒤 이만큼 있다가 나타납니다",
+        number(getString(R.string.after_clock), getString(R.string.after_clock_help),
                 Prefs.AFTER_CLOCK_MS, Prefs.DEF_AFTER_CLOCK_MS, 10, false);
-        number("잠금 해제 후 나타나는 시간", "시계처럼 일정한 속도로 밝아집니다",
+        number(getString(R.string.unlock_fade), getString(R.string.clock_like_fade_help),
                 Prefs.UNLOCK_FADE_MS, Prefs.DEF_UNLOCK_FADE_MS, 10, false);
 
-        section("실험실", null);
+        section(getString(R.string.section_labs), null);
         LinearLayout entry = row();
-        entry.addView(labels("실험실", "날짜 표시와 별개인 실험 기능. 전체 화면일 때 가로로 회전"),
+        entry.addView(labels(getString(R.string.section_labs), getString(R.string.labs_entry_help)),
                 new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         labEntryState = small("");
         labEntryState.setTextSize(15);
@@ -146,10 +145,8 @@ public class SettingsActivity extends Activity {
 
     /** The labs page: experimental features, apart from the date settings. */
     private void labsPage() {
-        section("실험실", "날짜 표시와 별개인 실험 기능입니다. 기본값은 꺼짐입니다.");
-        toggle("전체 화면일 때 가로로 회전", "아래에서 고른 앱이 전체 화면이 되면 가로로 고정하고, "
-                + "전체 화면이 풀리거나 다른 앱으로 가면 원래 회전 설정으로 돌려놓습니다. "
-                + "태블릿용 YouTube처럼 스스로 가로로 돌지 않는 앱을 위한 기능입니다.",
+        section(getString(R.string.section_labs), getString(R.string.labs_page_help));
+        toggle(getString(R.string.lab_rotate), getString(R.string.lab_rotate_help),
                 Prefs.LAB_ROTATE, Prefs.DEF_LAB_ROTATE, null);
         labPermissionRow();
         labApps();
@@ -161,12 +158,12 @@ public class SettingsActivity extends Activity {
     /** The rotation goes through the system rotation lock, which needs "modify system settings". */
     private void labPermissionRow() {
         LinearLayout row = row();
-        LinearLayout text = labels("시스템 설정 수정 권한", "화면 회전 잠금을 잠깐 가로로 걸기 위해 필요합니다");
+        LinearLayout text = labels(getString(R.string.lab_permission), getString(R.string.lab_permission_help));
         labPermission = small("");
         text.addView(labPermission);
         row.addView(text, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         Button open = new Button(this);
-        open.setText("허용하기");
+        open.setText(R.string.lab_permission_allow);
         open.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
                 android.net.Uri.parse("package:" + getPackageName()))));
         row.addView(open);
@@ -256,7 +253,7 @@ public class SettingsActivity extends Activity {
         page.addView(status);
 
         Button accessibility = new Button(this);
-        accessibility.setText("접근성 설정 열기");
+        accessibility.setText(R.string.open_accessibility_settings);
         accessibility.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         page.addView(accessibility, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -264,14 +261,14 @@ public class SettingsActivity extends Activity {
 
     private void updateStatus() {
         if (labEntryState != null) {
-            labEntryState.setText(prefs.getBoolean(Prefs.LAB_ROTATE, Prefs.DEF_LAB_ROTATE) ? "켜짐  ›" : "꺼짐  ›");
+            labEntryState.setText(prefs.getBoolean(Prefs.LAB_ROTATE, Prefs.DEF_LAB_ROTATE) ? R.string.labs_on : R.string.labs_off);
         }
         if (labPermission != null) {
-            labPermission.setText(FullscreenRotator.canWrite(this) ? "허용됨" : "필요: 허용하기를 눌러 주세요");
+            labPermission.setText(FullscreenRotator.canWrite(this) ? R.string.lab_permission_granted : R.string.lab_permission_needed);
         }
         int screen = getResources().getConfiguration().densityDpi;
-        status.setText("TopLineDate · 서비스: " + DateService.status() + "\n디스플레이 크기: " + screenLabel(screen)
-                + "  ·  적용 중인 프로필: " + screenLabel(dpi));
+        status.setText(getString(R.string.status_line, DateService.status(this), screenLabel(screen),
+                screenLabel(dpi)));
     }
 
     /** Display size profile: "auto" follows the tablet's display size setting. */
@@ -280,9 +277,9 @@ public class SettingsActivity extends Activity {
         group.setOrientation(RadioGroup.HORIZONTAL);
         String chosen = prefs.getString(Prefs.PROFILE, Prefs.DEF_PROFILE);
         String[][] options = {
-                {Prefs.DEF_PROFILE, "자동"},
-                {String.valueOf(Prefs.DPI_SMALL), "작게"},
-                {String.valueOf(Prefs.DPI_STANDARD), "표준"}};
+                {Prefs.DEF_PROFILE, getString(R.string.profile_auto)},
+                {String.valueOf(Prefs.DPI_SMALL), getString(R.string.profile_small)},
+                {String.valueOf(Prefs.DPI_STANDARD), getString(R.string.profile_standard)}};
         for (String[] option : options) {
             RadioButton button = new RadioButton(this);
             button.setText(option[1]);
@@ -302,10 +299,10 @@ public class SettingsActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         Button post = new Button(this);
-        post.setText("테스트 알림 보내기");
+        post.setText(R.string.post_test_notification);
         post.setOnClickListener(v -> postTest());
         Button clear = new Button(this);
-        clear.setText("테스트 알림 지우기");
+        clear.setText(R.string.clear_test_notification);
         clear.setOnClickListener(v -> getSystemService(NotificationManager.class).cancel(TEST_ID));
         row.addView(post, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(clear, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -320,13 +317,13 @@ public class SettingsActivity extends Activity {
             return;
         }
         NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(TEST_CHANNEL, "테스트 알림",
+        nm.createNotificationChannel(new NotificationChannel(TEST_CHANNEL, getString(R.string.test_channel),
                 NotificationManager.IMPORTANCE_DEFAULT));
         nm.cancel(TEST_ID);
         nm.notify(TEST_ID, new Notification.Builder(this, TEST_CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_menu_my_calendar)
-                .setContentTitle("TopLineDate 테스트")
-                .setContentText("상단 바에서 날짜 위치를 확인하세요. 눌러서 지울 수 있습니다.")
+                .setContentTitle(getString(R.string.test_title))
+                .setContentText(getString(R.string.test_text))
                 .setAutoCancel(true)
                 .setContentIntent(PendingIntent.getActivity(this, 0,
                         new Intent(this, SettingsActivity.class), PendingIntent.FLAG_IMMUTABLE))
@@ -356,13 +353,13 @@ public class SettingsActivity extends Activity {
         Settings.Secure.putString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
                 list == null || list.isEmpty() ? me : list + ":" + me);
         Settings.Secure.putInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 1);
-        Toast.makeText(this, "TopLineDate를 다시 켰습니다", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.service_reenabled, Toast.LENGTH_SHORT).show();
     }
 
-    private static String screenLabel(int screenDpi) {
-        if (screenDpi == Prefs.DPI_SMALL) return "작게";
-        if (screenDpi == Prefs.DPI_STANDARD) return "표준";
-        return "배율 " + screenDpi;
+    private String screenLabel(int screenDpi) {
+        if (screenDpi == Prefs.DPI_SMALL) return getString(R.string.profile_small);
+        if (screenDpi == Prefs.DPI_STANDARD) return getString(R.string.profile_standard);
+        return getString(R.string.profile_dpi, screenDpi);
     }
 
     // ============================================================================================
@@ -419,7 +416,12 @@ public class SettingsActivity extends Activity {
         edit.setTextColor(primary());
         edit.setText(prefs.getString(key, def));
         edit.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        Runnable save = () -> prefs.edit().putString(key, edit.getText().toString()).apply();
+        // An untouched default is not stored, so the date format default keeps following the language.
+        Runnable save = () -> {
+            String value = edit.getText().toString();
+            if (value.equals(def)) prefs.edit().remove(key).apply();
+            else prefs.edit().putString(key, value).apply();
+        };
         edit.setOnEditorActionListener((v, id, e) -> { save.run(); return false; });
         edit.setOnFocusChangeListener((v, focus) -> { if (!focus) save.run(); });
         box.addView(edit);

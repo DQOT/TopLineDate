@@ -47,12 +47,12 @@ public class TuneReceiver extends BroadcastReceiver {
     /** Test aid: a high-importance notification, which drops in as a heads-up card. */
     private static void postHeadsUp(Context context) {
         NotificationManager nm = context.getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel("headsup", "테스트 알림 (팝업)",
+        nm.createNotificationChannel(new NotificationChannel("headsup", context.getString(R.string.headsup_channel),
                 NotificationManager.IMPORTANCE_HIGH));
         nm.notify(2, new Notification.Builder(context, "headsup")
                 .setSmallIcon(android.R.drawable.ic_menu_my_calendar)
-                .setContentTitle("TopLineDate 팝업 테스트")
-                .setContentText("전체 화면에서 날짜가 뜨지 않아야 합니다.")
+                .setContentTitle(context.getString(R.string.headsup_title))
+                .setContentText(context.getString(R.string.headsup_text))
                 .setAutoCancel(true)
                 .build());
     }

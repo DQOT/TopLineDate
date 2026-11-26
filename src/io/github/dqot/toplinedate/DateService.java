@@ -82,10 +82,18 @@ public class DateService extends AccessibilityService
     private static final android.view.animation.Interpolator LINEAR = new android.view.animation.LinearInterpolator();
     private static final Pattern TIME = Pattern.compile("^[ ]*[0-9]{1,2}[ ]*[:.][ ]*[0-9]{2}.*");
 
-    private static volatile String lastStatus = "not connected";
+    private static volatile String lastStatus;   // null until the service first reports
 
+    /** For logs. */
     static String status() {
-        return lastStatus;
+        String s = lastStatus;
+        return s == null ? "not connected" : s;
+    }
+
+    /** For the settings screen, in the UI language. */
+    static String status(Context context) {
+        String s = lastStatus;
+        return s == null ? context.getString(R.string.service_not_connected) : s;
     }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -369,7 +377,7 @@ public class DateService extends AccessibilityService
             try { windowManager.removeView(view); } catch (IllegalArgumentException ignored) {}
             attached = false;
         }
-        lastStatus = "disconnected";
+        lastStatus = getString(R.string.service_disconnected);
     }
 
     // ============================================================================================
@@ -1059,7 +1067,8 @@ public class DateService extends AccessibilityService
 
     /** Runs on every check, so it formats only when the minute, pattern, locale or zone changed. */
     private void updateText() {
-        String pattern = prefs.getString(Prefs.FORMAT, Prefs.DEF_FORMAT);
+        String defPattern = Prefs.defFormat(this);
+        String pattern = prefs.getString(Prefs.FORMAT, defPattern);
         String key = pattern + "|" + (System.currentTimeMillis() / 60_000) + "|" + Locale.getDefault()
                 + "|" + java.util.TimeZone.getDefault().getID();
         if (key.equals(textKey)) return;
@@ -1068,7 +1077,7 @@ public class DateService extends AccessibilityService
         try {
             text = new SimpleDateFormat(pattern, Locale.getDefault()).format(new Date());
         } catch (IllegalArgumentException bad) {
-            text = new SimpleDateFormat(Prefs.DEF_FORMAT, Locale.getDefault()).format(new Date());
+            text = new SimpleDateFormat(defPattern, Locale.getDefault()).format(new Date());
         }
         if (!text.contentEquals(view.getText())) view.setText(text);
     }
@@ -1171,7 +1180,9 @@ public class DateService extends AccessibilityService
     }
 
     private void report() {
-        lastStatus = (shown ? "표시 중" : "숨김") + " · " + (landscape() ? "가로" : "세로")
-                + " · 배율 " + screenDpi + " · x " + params.x + " · " + view.getText();
+        lastStatus = getString(R.string.service_status,
+                getString(shown ? R.string.service_showing : R.string.service_hidden),
+                getString(landscape() ? R.string.orientation_landscape : R.string.orientation_portrait),
+                screenDpi, params.x, view.getText());
     }
 }

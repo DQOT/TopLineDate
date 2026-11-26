@@ -1,150 +1,146 @@
 # TopLineDate
 
-상단 바 시계 옆에 날짜와 요일을 표시하는 안드로이드 앱입니다. 루팅 없이 동작합니다.
+English | [한국어](README.ko.md)
 
-![상단 바](docs/statusbar.png)
+An Android app that shows the date and weekday next to the status bar clock. No root required.
 
-> **OPPO Pad mini에 맞춘 설정으로 배포합니다.** 다른 안드로이드 기기에서도 동작하지만, 글자 크기와
-> 위치, 애니메이션 타이밍 같은 기본값이 OPPO Pad mini(ColorOS 17)에 맞춰져 있습니다. 다른 기기에서는
-> 설정 화면의 **크기와 위치**에서 세부 조정이 필요합니다.
+![Status bar](docs/statusbar.png)
 
-ColorOS처럼 상단 바에 날짜를 띄우는 설정이 없는 기기를 위해 만들었습니다. 알림 아이콘에 날짜를 그리는 방식의 앱들은 ColorOS가 알림 아이콘을 앱 아이콘으로 바꿔 버려서 동작하지 않습니다. TopLineDate는 접근성 오버레이로 시계 바로 옆에 글자를 직접 그립니다.
+> **Released with settings tuned for the OPPO Pad mini.** It works on other Android devices too, but
+> defaults such as text size, position and animation timing are tuned for the OPPO Pad mini
+> (ColorOS 17). On other devices, fine-tune them under **Size and position** in the settings.
 
-> **English summary.** TopLineDate draws the date next to the status bar clock, without root,
-> using an accessibility overlay. It follows the clock (position, burn-in shift, notification
-> badge) and moves with it: it slides up and drops in with the bar in fullscreen, fades with it
-> on unlock and in recents, and turns with it on rotation. Timings were matched to the system
-> clock frame by frame on screen recordings. No internet permission. It runs on other Android
-> devices too, but the defaults are tuned for the OPPO Pad mini (ColorOS 17, China ROM), so other
-> devices need fine-tuning in the settings. The UI is in Korean.
+Made for devices like ColorOS that have no option to show the date in the status bar. Apps that draw the date into a notification icon don't work there, because ColorOS replaces notification icons with the app icon. TopLineDate instead draws the text right next to the clock with an accessibility overlay.
 
-## 특징
+## Features
 
-- **시계를 따라갑니다.** 시계 위치를 직접 찾아서 그 옆에 붙습니다. 알림 표시가 생기면 그 뒤로 옮겨 가고, 시스템이 화면 잔상 방지로 상단 바를 조금씩 옮겨도 따라갑니다.
-- **시계와 같이 움직입니다.** 화면 녹화로 시계와 날짜를 프레임 단위로 비교해서 타이밍과 속도를 맞췄습니다.
-  - 전체 화면에 들어가면 시계와 같이 위로 올라가 숨고, 나오면 같이 내려옵니다.
-  - 전체 화면에서 위를 살짝 내려 시계를 볼 때도 같이 내려왔다가 같이 들어갑니다.
-  - 잠금 해제 후에는 시계가 나타나는 순간에 맞춰 같은 속도로 밝아집니다.
-  - 최근 앱 화면, 알림창, 잠금 화면에서는 시계와 같이 숨습니다.
-- **여러 화면 상황을 구별합니다.** 분할 화면, 부동창과 그 점 세 개 메뉴, 키보드, 앱이 열리고 닫히며 화면이 회전하는 순간처럼 상단 바가 헷갈리게 보이는 상황을 따로 처리해서, 날짜가 혼자 깜빡이거나 남지 않게 했습니다.
-- **회전해도 바로 제자리로 갑니다.** 세로와 가로의 시계 위치를 기억해 두고, 앱 위에서든 홈 화면에서든 회전하는 동안 새 위치로 바로 옮겨 갑니다.
-- **글자 색 자동 전환.** 앱마다 상단 바 밝기에 맞춰 밝은 글자와 어두운 글자를 바꿉니다.
-- **디스플레이 크기별 설정.** 크기와 위치를 디스플레이 크기(작게, 표준 등)마다 따로 저장하고 자동으로 적용합니다.
-- **인터넷 권한 없음.** 아무 데이터도 밖으로 보내지 않습니다.
+- **Follows the clock.** It finds the clock itself and sits right next to it. When notification icons appear it moves behind them, and it follows when the system shifts the status bar slightly for burn-in protection.
+- **Moves with the clock.** Timing and speed were matched to the clock frame by frame on screen recordings.
+  - Entering fullscreen, it slides up and hides with the clock; leaving fullscreen, it drops back in with it.
+  - When you pull down the top edge in fullscreen to peek at the clock, it drops in and goes back with it.
+  - After unlock, it brightens at the same rate, right when the clock appears.
+  - It hides with the clock on the recents screen, the notification shade and the lock screen.
+- **Tells screen situations apart.** Split screen, floating windows and their three-dot menu, the keyboard, and rotations while apps open and close can make the status bar look ambiguous. Each case is handled separately so the date never blinks or lingers on its own.
+- **Snaps into place on rotation.** It remembers where the clock sits in portrait and landscape, and moves straight to the new spot while rotating, over an app or on the home screen.
+- **Automatic text color.** Switches between light and dark text to match the status bar brightness of each app.
+- **Per display size settings.** Size and position are saved separately for each display size (Small, Default and so on) and applied automatically.
+- **Follows the system language.** The UI is in Korean when the device language is Korean, and in English for every other language. The default date format in the status bar follows the language too.
+- **No internet permission.** It sends no data anywhere.
 
-## 요구 사항
+## Requirements
 
-- Android 11 이상
-- 최적화 기기: OPPO Pad mini (OPD2515), ColorOS 17 중국 내수용
-  - 디스플레이 크기 "작게"와 "표준" 두 가지에 맞춘 기본값이 들어 있고, 지금 디스플레이 크기에 따라 자동으로 적용됩니다.
-- 다른 기기: 동작하지만 세부 조정이 필요합니다. 기기마다 상단 바 높이, 시계 글꼴과 크기가 달라서, 설정 화면의 **크기와 위치**에서 다음 값을 맞춰 주세요.
-  - 글자 크기, 굵기
-  - 시계와의 간격, 알림 표시와의 간격
-  - 세로와 가로 화면 높이(미세 높이 포함)
-- 상단 바 구조가 많이 다른 기기에서는 시계를 자동으로 찾지 못할 수 있습니다. 그때는 **시계 옆에 자동으로 붙이기**를 끄고 X 좌표를 직접 지정합니다.
+- Android 11 or later
+- Tuned for: OPPO Pad mini (OPD2515), ColorOS 17, China ROM
+  - Ships with defaults for two display sizes, "Small" and "Default", applied automatically according to the current display size.
+- Other devices: it works, but needs fine-tuning. Status bar height and clock font and size differ by device, so adjust these under **Size and position** in the settings.
+  - Text size, weight
+  - Gap to clock, gap to notification icons
+  - Portrait and landscape height (including fine height)
+- On devices with a very different status bar layout, it may not find the clock automatically. In that case turn off **Attach to the clock automatically** and set the X position yourself.
 
-## 설치와 초기 설정
+## Installation and setup
 
-### 1. 설치
+### 1. Install
 
-[Releases](../../releases)에서 `TopLineDate.apk`를 받아 설치합니다. "출처를 알 수 없는 앱 설치" 허용을 물으면 허용합니다.
+Download `TopLineDate.apk` from [Releases](../../releases) and install it. Allow "install unknown apps" if asked.
 
-### 2. 제한된 설정 허용
+### 2. Allow restricted settings
 
-안드로이드 13부터는 직접 설치한 앱이 접근성을 바로 켤 수 없게 막혀 있습니다.
+Since Android 13, sideloaded apps cannot turn on accessibility right away.
 
-설정 → 앱 → 앱 관리 → TopLineDate → 오른쪽 위 메뉴(⋮) → **제한된 설정 허용**
+Settings → Apps → App management → TopLineDate → menu at the top right (⋮) → **Allow restricted settings**
 
-ColorOS에서는 "권한 제한 해제"로 표시될 수 있습니다.
+On ColorOS this may be labeled "Remove permission restrictions".
 
-### 3. 접근성 켜기
+### 3. Turn on accessibility
 
-TopLineDate를 열고 **접근성 설정 열기**를 누른 뒤, 다운로드한 앱 → TopLineDate를 켭니다.
+Open TopLineDate, tap **Open accessibility settings**, then turn on Downloaded apps → TopLineDate.
 
-### 4. 최근 앱 정리에서 제외 (ColorOS 권장)
+### 4. Keep it out of recents cleanup (recommended on ColorOS)
 
-ColorOS는 "최근 앱 모두 닫기"를 하면 백그라운드 앱을 강제 종료합니다. 그러면 안드로이드가 접근성 연결도 끊어 버립니다.
+On ColorOS, "Close all" in recents force-stops background apps. Android then also disconnects the accessibility service.
 
-1. TopLineDate 설정 화면을 연 채로 최근 앱 화면으로 갑니다.
-2. TopLineDate 카드를 **잠급니다**.
-3. 설정 화면으로 돌아와 **최근 앱에 표시**를 끕니다. 잠금은 유지되고 카드만 숨겨집니다.
+1. With the TopLineDate settings screen open, go to the recents screen.
+2. **Lock** the TopLineDate card.
+3. Go back to the settings screen and turn off **Show in recents**. The lock stays; only the card is hidden.
 
-ColorOS 설정에서 TopLineDate의 **자동 실행**과 **백그라운드 활동**도 허용해 두면 좋습니다.
+It also helps to allow **Auto launch** and **Background activity** for TopLineDate in the ColorOS settings.
 
-### 5. 권장: 알림 아이콘 표시 방식
+### 5. Recommended: notification icon style
 
-설정 → 알림 및 빠른 설정 → 상태 표시줄 → 알림 아이콘을 **숫자 표시** 또는 **표시하지 않음**으로 두는 것을 권장합니다.
+Settings → Notifications & quick settings → Status bar → set notification icons to **Number** or **Don't show**.
 
-**아이콘 표시**에서도 겹치지 않고 동작합니다. 다만 알림 아이콘 개수에 따라 날짜 위치가 계속 바뀝니다.
+It also works with **Icons** without overlapping, but the date position keeps changing with the number of notification icons.
 
-### 6. (선택) 자동 복구 권한
+### 6. (Optional) Auto-recovery permission
 
-PC와 ADB가 있다면 아래 명령으로 권한을 하나 줄 수 있습니다. 앱이 강제 종료되어 접근성이 꺼져도, TopLineDate를 한 번 열면 접근성이 자동으로 다시 켜집니다.
+With a PC and ADB you can grant one more permission. Then, even if the app is force-stopped and accessibility turns off, opening TopLineDate once turns accessibility back on automatically.
 
 ```sh
 adb shell pm grant io.github.dqot.toplinedate android.permission.WRITE_SECURE_SETTINGS
 ```
 
-ColorOS에서 `SecurityException`이 나면 개발자 옵션의 **Disable System Optimization**을 켠 뒤 다시 실행합니다. 이 메뉴는 시스템 언어가 영어일 때만 보일 수 있습니다.
+If ColorOS throws a `SecurityException`, turn on **Disable System Optimization** in Developer options and run it again. This option may only be visible when the system language is English.
 
-## 설정
+## Settings
 
-![설정 화면](docs/settings.png)
+![Settings screen](docs/settings.png)
 
-| 카드 | 내용 |
+| Card | Contents |
 |---|---|
-| 앱 유지 | 최근 앱에 표시 |
-| 표시 | 날짜 표시, 형식, 글자 색, 글꼴, 굵기 |
-| 크기와 위치 | 디스플레이 크기 프로필(자동, 작게, 표준), 글자 크기, 시계와의 간격, 알림 표시와의 간격, 높이 보정 |
-| 알림 표시 | 테스트 알림 보내기, 알림 표시가 생기거나 사라질 때 이동 시간 |
-| 숨김 | 전체 화면에서 숨기기, 시계가 숨으면 같이 숨기기, 전체 화면에서 나올 때 미리 표시 |
-| 애니메이션과 타이밍 | 전체 화면에서 내려오고 올라가는 시간, 분할 화면에서 내려오는 시간, 페이드, 회전, 최근 앱에서 돌아올 때, 잠금 해제 후 |
-| 실험실 | 전체 화면일 때 가로로 회전 (아래 참고) |
+| Keep running | Show in recents |
+| Display | Show date, format, text color, font, weight |
+| Size and position | Display size profile (Auto, Small, Default), text size, gap to clock, gap to notification icons, height adjustments |
+| Notification icons | Send test notification, move time when notification icons appear or go |
+| Hiding | Hide in fullscreen, hide when the clock hides, show early when leaving fullscreen |
+| Animation and timing | Drop-in and slide-up times for fullscreen, drop-in time in split screen, fades, rotation, returning from recents, after unlock |
+| Labs | Landscape in fullscreen (see below) |
 
-**형식**은 Java의 [SimpleDateFormat](https://developer.android.com/reference/java/text/SimpleDateFormat) 패턴입니다.
+**Format** is a Java [SimpleDateFormat](https://developer.android.com/reference/java/text/SimpleDateFormat) pattern. The default is `M월 d일 EEEE` in Korean; in other languages it is that language's short month, day and weekday format (`EEE, MMM d` in English, e.g. Thu, Nov 26).
 
-| 형식 | 표시 |
+| Format | Shows |
 |---|---|
-| `M월 d일 EEEE` | 11월 17일 화요일 |
-| `M/d E` | 11/17 화 |
-| `M.d (E)` | 11.17 (화) |
+| `EEE, MMM d` | Tue, Nov 17 |
+| `M/d E` | 11/17 Tue |
+| `EEEE, MMMM d` | Tuesday, November 17 |
+| `M월 d일 EEEE` | 11월 17일 화요일 (Korean) |
 
-값은 바꾸는 즉시 상단 바에 반영됩니다. **크기와 위치** 카드의 값은 지금 선택된 디스플레이 크기 프로필에 저장됩니다. 애니메이션과 타이밍의 기본값은 OPPO Pad mini의 화면 녹화에서 잰 값입니다.
+Changes show in the status bar right away. Values in the **Size and position** card are saved to the currently selected display size profile. The animation and timing defaults were measured from screen recordings on the OPPO Pad mini.
 
-## 실험실
+## Labs
 
-설정 맨 아래의 **실험실**에 날짜 표시와 별개인 실험 기능이 있습니다. 기본값은 꺼짐입니다.
+**Labs**, at the bottom of the settings, holds experimental features separate from the date. They are off by default.
 
-**전체 화면일 때 가로로 회전**: 고른 앱(기본값 YouTube, 넷플릭스)이 전체 화면이 되면 화면을 가로로 고정하고, 전체 화면이 풀리거나 다른 앱으로 가면 원래 회전 설정으로 돌려놓습니다. 태블릿용 YouTube처럼 전체 화면에서도 스스로 가로로 돌지 않는 앱을 위한 기능입니다.
+**Landscape in fullscreen**: when a chosen app (YouTube and Netflix by default) goes fullscreen, the screen is locked to landscape; when fullscreen ends or you switch to another app, the original rotation setting is restored. Meant for apps like YouTube for tablets that don't rotate to landscape on their own, even in fullscreen.
 
-- 안드로이드 16부터 큰 화면에서는 앱의 화면 방향 요청이 무시되기 때문에, 시스템 화면 회전 잠금을 잠깐 가로로 거는 방식으로 동작합니다.
-- 가로로 고정된 동안에도 태블릿을 반대쪽 가로로 돌리면 따라 돕니다.
-- 실험실 화면에서 **시스템 설정 수정** 권한을 허용해야 합니다.
-- 원래 회전 설정(자동 회전 여부, 방향)은 저장해 두었다가 그대로 되돌립니다. 앱이 비정상 종료되면 다음에 켜질 때 되돌리고, 업데이트 직후 같은 앱이 아직 전체 화면이면 잠금을 그대로 이어 갑니다.
+- Since Android 16, apps' orientation requests are ignored on large screens, so it works by briefly setting the system rotation lock to landscape.
+- While locked to landscape, it still follows when you turn the tablet to the opposite landscape side.
+- The **Modify system settings** permission must be allowed on the Labs screen.
+- The original rotation setting (auto-rotate on or off, orientation) is saved and restored as it was. If the app crashes, it is restored on the next start; if the same app is still fullscreen right after an update, the lock simply carries on.
 
-## 권한과 개인정보
+## Permissions and privacy
 
-| 권한 | 용도 |
+| Permission | Used for |
 |---|---|
-| 접근성 서비스 | 상단 바 위에 날짜 그리기, 창 위치와 크기 확인, 상단 바 시계와 그 옆 아이콘의 위치 확인 |
-| 접근성 스크린샷 | 글자 색 자동 모드에서 앱이 바뀔 때 상단 바의 밝기만 확인 |
-| 알림 | 설정 화면의 테스트 알림 버튼 |
-| 보안 설정 쓰기 (선택, ADB) | 꺼진 접근성을 다시 켜기 |
-| 시스템 설정 수정 (실험실, 선택) | 전체 화면일 때 화면 회전 잠금을 잠깐 가로로 걸기 |
+| Accessibility service | Drawing the date over the status bar, checking window position and size, locating the status bar clock and the icons beside it |
+| Accessibility screenshot | In automatic text color mode, checking only the status bar brightness when the app changes |
+| Notifications | The test notification button on the settings screen |
+| Write secure settings (optional, ADB) | Turning accessibility back on after it was switched off |
+| Modify system settings (Labs, optional) | Briefly setting the rotation lock to landscape in fullscreen |
 
-- 상단 바 말고 다른 화면 내용은 읽지 않습니다.
-- 스크린샷은 메모리에서 밝기만 계산하고 바로 버립니다. 저장하거나 전송하지 않습니다.
-- 인터넷 권한이 없습니다.
+- It reads no screen content other than the status bar.
+- Screenshots are used in memory only to compute brightness and are discarded right away. They are never saved or sent.
+- No internet permission.
 
-## 알려진 한계
+## Known limitations
 
-날짜는 시스템이 알려 주는 상단 바의 변화에 맞춰 움직입니다. 시스템이 미리 알려 주지 않는 경우에는 시계보다 조금 늦습니다.
+The date moves with the status bar changes the system reports. When the system does not report them in advance, it lags slightly behind the clock.
 
-- **분할 화면**: 시스템이 상단 바가 다 내려온 뒤에야 알려 줘서, 날짜가 시계보다 조금 늦게 나타납니다. 숨을 때는 바가 올라가는 도중의 위치에서 따라 올라갑니다.
-- **상단 바를 제자리에서 흐리게 지우는 앱(예: 리디)**: 흐려지기 시작하는 순간을 알 수 없어서, 날짜는 시계가 다 사라진 뒤에 사라집니다.
-- **알림창과 최근 앱 화면으로 들어갈 때**: 시계가 흐려지기 시작한 뒤에 신호가 와서, 날짜가 약 0.1초 늦게 사라집니다.
-- 다른 제조사의 상단 바 구조에서는 시계를 찾지 못할 수 있습니다. 그때는 **시계 옆에 자동으로 붙이기**를 끄고 X 좌표를 직접 지정합니다.
+- **Split screen**: the system reports the status bar only after it has fully dropped in, so the date appears slightly after the clock. When hiding, it follows the bar up from wherever the bar is mid-slide.
+- **Apps that fade the status bar out in place (e.g. Ridi)**: the moment the fade starts can't be detected, so the date disappears after the clock has fully gone.
+- **Entering the notification shade and the recents screen**: the signal arrives after the clock starts fading, so the date disappears about 0.1 s late.
+- It may not find the clock on other manufacturers' status bar layouts. In that case turn off **Attach to the clock automatically** and set the X position yourself.
 
-## 라이선스
+## License
 
 [MIT](LICENSE)

@@ -19,7 +19,6 @@ final class Prefs {
     static final String SHOW_IN_RECENTS = "showInRecents"; // boolean, settings screen card
 
     static final boolean DEF_ENABLED = true;
-    static final String DEF_FORMAT = "M월 d일 EEEE";
     static final String DEF_COLOR = "auto";
     static final String DEF_FONT = "";
     static final int DEF_WEIGHT = 700;                     // matches the clock's stroke width
@@ -104,6 +103,24 @@ final class Prefs {
     static SharedPreferences get(Context context) {
         return context.getSharedPreferences(FILE, Context.MODE_PRIVATE);
     }
+
+    /**
+     * Default date pattern for the current language: the resource (Korean: "M월 d일 EEEE"), or,
+     * when it is empty, the locale's own short month/day/weekday pattern (English: "EEE, MMM d").
+     */
+    static synchronized String defFormat(Context context) {
+        String pattern = context.getString(R.string.date_format_default);
+        if (!pattern.isEmpty()) return pattern;
+        java.util.Locale locale = context.getResources().getConfiguration().getLocales().get(0);
+        if (!locale.equals(bestLocale)) {   // called on every check: ask ICU once per locale
+            bestPattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMEd");
+            bestLocale = locale;
+        }
+        return bestPattern;
+    }
+
+    private static java.util.Locale bestLocale;
+    private static String bestPattern;
 
     static String key(String key, int dpi) {
         return key + "@" + dpi;

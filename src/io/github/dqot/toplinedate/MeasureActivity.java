@@ -24,7 +24,7 @@ public class MeasureActivity extends Activity {
         view.setBackgroundColor(Color.BLACK);
         view.setTextColor(0xFF555555);
         view.setGravity(Gravity.CENTER);
-        view.setText("측정용 화면 · 오른쪽 절반을 탭하면 전체 화면 전환");
+        view.setText(R.string.measure_hint);
         view.setOnTouchListener((v, e) -> {
             // The left half does nothing: a tap there only dismisses a swiped-in bar.
             if (e.getAction() == android.view.MotionEvent.ACTION_UP && e.getX() > v.getWidth() / 2f) toggle();

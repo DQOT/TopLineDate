@@ -1,4 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="a11y_desc">상단 바 시계 옆에 날짜와 요일을 표시합니다. 화면 내용은 읽지 않고, 전체 화면 여부를 알기 위해 시스템 창의 위치와 크기만 확인합니다. 글자 색 자동 모드에서는 앱이 바뀔 때 상단 바 배경 밝기만 확인하며, 화면은 저장하거나 전송하지 않습니다.</string>
+    <string name="app_name" translatable="false">TopLineDate</string>
+
+    <!-- Accessibility service description -->
+    <string name="a11y_desc">Shows the date and weekday next to the status bar clock. It does not read screen content; it only checks the position and size of system windows to tell whether an app is fullscreen. In automatic text color mode it only checks the brightness of the status bar when the app changes, and never saves or sends the screen.</string>
+
+    <!-- Status bar date: SimpleDateFormat pattern used when the user has not set one.
+         Empty = the locale's own short month/day/weekday pattern (e.g. "Thu, Nov 26"). -->
+    <string name="date_format_default"></string>
+
+    <!-- Settings: header and status line -->
+    <string name="open_accessibility_settings">Open accessibility settings</string>
+    <string name="status_line">"TopLineDate · Service: %1$s\nDisplay size: %2$s  ·  Active profile: %3$s"</string>
+    <string name="service_not_connected">not connected</string>
+    <string name="service_disconnected">disconnected</string>
+    <string name="service_status">%1$s · %2$s · dpi %3$d · x %4$d · %5$s</string>
+    <string name="service_showing">showing</string>
+    <string name="service_hidden">hidden</string>
+    <string name="orientation_landscape">landscape</string>
+    <string name="orientation_portrait">portrait</string>
+
+    <!-- Display size profiles -->
+    <string name="profile_auto">Auto</string>
+    <string name="profile_small">Small</string>
+    <string name="profile_standard">Default</string>
+    <string name="profile_dpi">%1$d dpi</string>
+
+    <!-- Card: keep the app -->
+    <string name="section_keep_app">Keep running</string>
+    <string name="section_keep_app_help">To survive \"Close all\" in recents, lock this app\'s card on the recents screen, then turn off \"Show in recents\". The lock stays; only the card is hidden.</string>
+    <string name="show_in_recents">Show in recents</string>
+
+    <!-- Card: display -->
+    <string name="section_display">Display</string>
+    <string name="show_date">Show date</string>
+    <string name="format">Format</string>
+    <string name="format_help">e.g. EEE, MMM d · M/d E · EEEE d MMMM</string>
+    <string name="text_color">Text color</string>
+    <string name="text_color_help">auto or #RRGGBB. auto follows the status bar brightness.</string>
+    <string name="font">Font</string>
+    <string name="font_help">Empty uses the system font</string>
+    <string name="weight">Weight</string>
+    <string name="weight_help">100-900. 700 matches the clock\'s stroke width.</string>
+
+    <!-- Card: size and position -->
+    <string name="section_size_position">Size and position</string>
+    <string name="section_size_position_help">These values are saved separately for each display size.</string>
+    <string name="text_size">Text size</string>
+    <string name="unit_px">px</string>
+    <string name="unit_px_decimal">px, decimals allowed</string>
+    <string name="gap_clock">Gap to clock</string>
+    <string name="gap_clock_help">Without notification icons, px</string>
+    <string name="gap_badge">Gap to notification icons</string>
+    <string name="gap_badge_help">With notification icons, px</string>
+    <string name="portrait_y">Portrait height</string>
+    <string name="portrait_fine_y">Portrait fine height</string>
+    <string name="landscape_y">Landscape height</string>
+    <string name="landscape_fine_y">Landscape fine height</string>
+    <string name="anchor">Attach to the clock automatically</string>
+    <string name="anchor_help">When off, the X values below are used</string>
+    <string name="portrait_x">Portrait X</string>
+    <string name="landscape_x">Landscape X</string>
+    <string name="fixed_x_help">When auto attach is off, px</string>
+
+    <!-- Card: notification badge -->
+    <string name="section_badge">Notification icons</string>
+    <string name="section_badge_help">How fast the date moves aside when notification icons appear or disappear.</string>
+    <string name="slide_in">Move time when they appear</string>
+    <string name="slide_out">Move time when they go</string>
+    <string name="slide_help">ms, 0 moves at once</string>
+    <string name="post_test_notification">Send test notification</string>
+    <string name="clear_test_notification">Clear test notification</string>
+
+    <!-- Card: hiding -->
+    <string name="section_hiding">Hiding</string>
+    <string name="hide_fullscreen">Hide in fullscreen</string>
+    <string name="hide_with_clock">Hide when the clock hides</string>
+    <string name="hide_with_clock_help">Recents, entering fullscreen, right after unlock, and so on</string>
+    <string name="predict">Show early when leaving fullscreen</string>
+    <string name="predict_help">Appears about 0.3 s before the status bar</string>
+
+    <!-- Card: animation and timing -->
+    <string name="section_timing">Animation and timing</string>
+    <string name="section_timing_help">All values are in ms.</string>
+    <string name="bar_slide">Drop-in time after fullscreen</string>
+    <string name="bar_hide">Slide-up time into fullscreen</string>
+    <string name="zero_fades_help">0 fades instead</string>
+    <string name="late_drop">Drop-in time in split screen</string>
+    <string name="late_drop_help">When the status bar is reported late. 0 appears at once</string>
+    <string name="fade_in">Fade in</string>
+    <string name="fade_out">Fade out</string>
+    <string name="rotate_grace">Stay visible while rotating</string>
+    <string name="rotate_grace_help">0 hides during rotation</string>
+    <string name="rotate_delay">Wait after rotation</string>
+    <string name="rotate_delay_help">When \"Stay visible\" is 0</string>
+    <string name="clock_back_fade">Fade-in when returning from recents</string>
+    <string name="clock_like_fade_help">Brightens at a steady rate, like the clock</string>
+    <string name="after_clock">Wait after the clock on unlock</string>
+    <string name="after_clock_help">After unlock, appears this long after the clock is visible again</string>
+    <string name="unlock_fade">Fade-in after unlock</string>
+
+    <!-- Labs -->
+    <string name="section_labs">Labs</string>
+    <string name="labs_entry_help">Experimental features, separate from the date. Landscape in fullscreen</string>
+    <string name="labs_on">"On  ›"</string>
+    <string name="labs_off">"Off  ›"</string>
+    <string name="labs_page_help">Experimental features, separate from the date. All are off by default.</string>
+    <string name="lab_rotate">Landscape in fullscreen</string>
+    <string name="lab_rotate_help">When an app chosen below goes fullscreen, lock the screen to landscape; when fullscreen ends or you switch apps, restore the original rotation setting. Meant for apps like YouTube for tablets that don\'t rotate to landscape on their own.</string>
+    <string name="lab_permission">Modify system settings</string>
+    <string name="lab_permission_help">Needed to briefly lock screen rotation to landscape</string>
+    <string name="lab_permission_allow">Allow</string>
+    <string name="lab_permission_granted">Allowed</string>
+    <string name="lab_permission_needed">Required: tap Allow</string>
+
+    <!-- Notifications and toasts -->
+    <string name="test_channel">Test notifications</string>
+    <string name="test_title">TopLineDate test</string>
+    <string name="test_text">Check where the date sits in the status bar. Tap to dismiss.</string>
+    <string name="headsup_channel">Test notifications (pop-up)</string>
+    <string name="headsup_title">TopLineDate pop-up test</string>
+    <string name="headsup_text">The date should not appear in fullscreen.</string>
+    <string name="service_reenabled">TopLineDate turned back on</string>
+
+    <!-- MeasureActivity (adb-only development screen) -->
+    <string name="measure_hint">Measuring screen · tap the right half to toggle fullscreen</string>
 </resources>
