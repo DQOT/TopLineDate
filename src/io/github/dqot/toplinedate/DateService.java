@@ -72,7 +72,7 @@ public class DateService extends AccessibilityService
 
     private static final String SYSTEM_UI = "com.android.systemui";
     private static final String LAUNCHER = "com.android.launcher";
-    private static final int DARK_TEXT = 0xCC000000;   // the ColorOS clock is 80% alpha
+    private static final int DARK_TEXT = 0xCC000000;   // before the clock is measured: the ColorOS clock is 80% alpha
     private static final int LIGHT_TEXT = 0xCCFFFFFF;
     private static final PathInterpolator EASE = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
     private static final android.view.animation.Interpolator ACCEL = new android.view.animation.AccelerateInterpolator();
@@ -133,6 +133,8 @@ public class DateService extends AccessibilityService
     private AccessibilityNodeInfo clockNode;
     private boolean clockVisible = true;
     private int clockRight = -1;
+    private final Rect clockBox = new Rect();   // last clock bounds, for measuring its text alpha
+    private int textAlpha = 0xCC;                // the system clock's measured alpha, 0-255
     private int iconsWidth;                         // e.g. a notification badge after the clock
     private int anchorRight = -1;                   // clock right edge plus those icons
     private int anchorCenterY;
@@ -521,6 +523,7 @@ public class DateService extends AccessibilityService
         foreground = app;
         appShownAt = SystemClock.uptimeMillis();
         Integer remembered = colorByApp.get(app);
+        if (remembered != null) remembered = (textAlpha << 24) | (remembered & 0xFFFFFF);
         if (remembered != null && autoColorMode() && remembered != autoColor) {
             autoColor = remembered;   // right colour from the first frame
             view.setTextColor(autoColor);
@@ -779,6 +782,7 @@ public class DateService extends AccessibilityService
             position(slide);
         }
         clockRight = clock.right;
+        clockBox.set(clock);
         iconsWidth = right - clock.right;   // the same in both orientations at one display size
         learnClockGeometry();
     }
@@ -820,6 +824,8 @@ public class DateService extends AccessibilityService
 
     private void loadClockGeometry() {
         SharedPreferences saved = getSharedPreferences("anchor", MODE_PRIVATE);
+        textAlpha = saved.getInt("textAlpha", 0xCC);
+        autoColor = (textAlpha << 24) | (autoColor & 0xFFFFFF);
         shift = saved.getInt("shift@" + screenDpi, 0);
         for (int o = 0; o < 2; o++) {
             clockBase[o] = saved.getInt("base" + o + "@" + screenDpi, Prefs.defClockBase(o, screenDpi));
@@ -1121,8 +1127,10 @@ public class DateService extends AccessibilityService
                 buffer.close();
                 if (soft == null) return;
                 float luminance = barLuminance(soft, Math.max(4, barHeight));
+                boolean dark = luminance > 0.55f;
+                if (clockVisible && statusBarVisible) learnTextAlpha(soft, dark);
                 soft.recycle();
-                int color = luminance > 0.55f ? DARK_TEXT : LIGHT_TEXT;
+                int color = (textAlpha << 24) | (dark ? 0x000000 : 0xFFFFFF);
                 colorByApp.put(foreground, color);
                 autoColor = color;
                 if (autoColorMode()) view.setTextColor(autoColor);
@@ -1133,6 +1141,40 @@ public class DateService extends AccessibilityService
                 Log.w(TAG, "screenshot failed " + errorCode);
             }
         });
+    }
+
+    /**
+     * Measures how opaque the system clock's digits are: the ColorOS clock is 80% alpha, Pixel's is
+     * opaque. Background = median of the clock box (digits cover well under half of it); the
+     * strongest stroke pixels give the alpha, since a pixel = a * text + (1 - a) * background.
+     */
+    private void learnTextAlpha(Bitmap bitmap, boolean darkText) {
+        Rect box = new Rect(clockBox);
+        if (box.isEmpty() || !box.intersect(0, 0, bitmap.getWidth(), bitmap.getHeight())) return;
+        int n = box.width() * box.height();
+        if (n < 50) return;
+        float[] lum = new float[n];
+        int i = 0;
+        for (int y = box.top; y < box.bottom; y++) {
+            for (int x = box.left; x < box.right; x++) {
+                int c = bitmap.getPixel(x, y);
+                lum[i++] = (0.2126f * Color.red(c) + 0.7152f * Color.green(c) + 0.0722f * Color.blue(c)) / 255f;
+            }
+        }
+        float[] sorted = lum.clone();
+        Arrays.sort(sorted);
+        float background = sorted[n / 2];
+        float text = darkText ? 0f : 1f;
+        float range = Math.abs(text - background);
+        if (range < 0.35f) return;   // too little contrast to tell
+        // 98th percentile of the stroke toward the text colour: core pixels, not anti-aliased edges.
+        float core = darkText ? sorted[(int) (n * 0.02f)] : sorted[(int) (n * 0.98f)];
+        float alpha = Math.abs(core - background) / range;
+        int measured = Math.round(Math.max(0.4f, Math.min(1f, alpha)) * 255f);
+        Log.i(TAG, "clock alpha " + measured + " bg=" + background + " core=" + core);
+        if (Math.abs(measured - textAlpha) < 8) return;   // noise
+        textAlpha = measured;
+        getSharedPreferences("anchor", MODE_PRIVATE).edit().putInt("textAlpha", textAlpha).apply();
     }
 
     /** Median brightness of two rows near the top and bottom of the bar, away from the text. */
