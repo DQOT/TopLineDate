@@ -1166,13 +1166,16 @@ public class DateService extends AccessibilityService
         float background = sorted[n / 2];
         float text = darkText ? 0f : 1f;
         float range = Math.abs(text - background);
-        if (range < 0.35f) return;   // too little contrast to tell
+        // Only over a plain background: behind a wallpaper the median is not what the digits blend with.
+        float spread = darkText ? sorted[(int) (n * 0.9f)] - background : background - sorted[(int) (n * 0.1f)];
         // 98th percentile of the stroke toward the text colour: core pixels, not anti-aliased edges.
         float core = darkText ? sorted[(int) (n * 0.02f)] : sorted[(int) (n * 0.98f)];
-        float alpha = Math.abs(core - background) / range;
+        float alpha = range > 0f ? Math.abs(core - background) / range : 0f;
         int measured = Math.round(Math.max(0.4f, Math.min(1f, alpha)) * 255f);
-        Log.i(TAG, "clock alpha " + measured + " bg=" + background + " core=" + core);
-        if (Math.abs(measured - textAlpha) < 8) return;   // noise
+        boolean usable = range >= 0.35f && spread <= 0.12f;   // enough contrast, plain background
+        Log.i(TAG, "clock alpha " + measured + (usable ? "" : " (skipped)") + " bg=" + background
+                + " core=" + core + " spread=" + spread + " box=" + box.toShortString());
+        if (!usable || Math.abs(measured - textAlpha) < 8) return;   // < 8: noise
         textAlpha = measured;
         getSharedPreferences("anchor", MODE_PRIVATE).edit().putInt("textAlpha", textAlpha).apply();
     }
