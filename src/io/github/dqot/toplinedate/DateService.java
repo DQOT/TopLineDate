@@ -1139,8 +1139,16 @@ public class DateService extends AccessibilityService
             public void onSuccess(ScreenshotResult result) {
                 HardwareBuffer buffer = result.getHardwareBuffer();
                 Bitmap hardware = Bitmap.wrapHardwareBuffer(buffer, result.getColorSpace());
-                Bitmap soft = hardware == null ? null : hardware.copy(Bitmap.Config.ARGB_8888, false);
-                if (hardware != null) hardware.recycle();
+                Bitmap soft = null;
+                if (hardware != null) {
+                    // Only the bar strip (and the clock, for the tint check) is read: copying it alone
+                    // instead of the whole screen moves about 5% of the pixels.
+                    int h = Math.min(hardware.getHeight(), Math.max(barHeight, clockBox.bottom) + 2);
+                    Bitmap strip = Bitmap.createBitmap(hardware, 0, 0, hardware.getWidth(), Math.max(4, h));
+                    soft = strip.copy(Bitmap.Config.ARGB_8888, false);
+                    if (strip != hardware) strip.recycle();
+                    hardware.recycle();
+                }
                 buffer.close();
                 if (soft == null) return;
                 float luminance = barLuminance(soft, Math.max(4, barHeight));
