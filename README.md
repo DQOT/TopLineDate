@@ -25,7 +25,7 @@ Made for devices like ColorOS that have no option to show the date in the status
 - **Automatic text color.** Fades between the system clock's own light and dark text colors to match the status bar brightness.
 - **Per display size settings.** Size and position are saved separately for each display size (Small, Default and so on) and applied automatically.
 - **Follows the system language.** The UI is in Korean when the device language is Korean, and in English for every other language. The default date format in the status bar follows the language too.
-- **No internet permission.** It sends no data anywhere.
+- **Update notice.** Once a day it asks GitHub whether a new release is out and tells you with a notification. That is its only network use; it sends nothing about your device or screen, and you can turn it off in the settings.
 
 ## Requirements
 
@@ -124,13 +124,14 @@ Changes show in the status bar right away. Values in the **Size and position** c
 |---|---|
 | Accessibility service | Drawing the date over the status bar, checking window position and size, locating the status bar clock and the icons beside it |
 | Accessibility screenshot | In automatic text color mode, checking only the status bar brightness when the app changes or scrolls (once at first, also the clock's text color) |
-| Notifications | The test notification button on the settings screen |
+| Notifications | The update notice, and the test notification button on the settings screen |
+| Internet, network state, run at startup | The daily update check: one request to api.github.com for the latest release (can be turned off) |
 | Write secure settings (optional, ADB) | Turning accessibility back on after it was switched off |
 | Modify system settings (Labs, optional) | Briefly setting the rotation lock to landscape in fullscreen |
 
 - It reads no screen content other than the status bar.
 - Screenshots are used in memory only to compute brightness and are discarded right away. They are never saved or sent.
-- No internet permission.
+- The only network request is the update check above. Screen content, settings and device details are never sent.
 
 ## Known limitations
 

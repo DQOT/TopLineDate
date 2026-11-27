@@ -85,6 +85,10 @@ final class Prefs {
     static final String LAB_ROTATE = "labRotate";          // landscape while a listed app is fullscreen
     static final String LAB_APPS = "labApps";              // Set<String> of package names
     static final boolean DEF_LAB_ROTATE = false;
+
+    // Updates
+    static final String UPDATE_CHECK = "updateCheck";      // daily check for a new GitHub release
+    static final boolean DEF_UPDATE_CHECK = true;
     static final java.util.Set<String> DEF_LAB_APPS = java.util.Collections.unmodifiableSet(
             new java.util.HashSet<>(java.util.Arrays.asList(
                     "com.google.android.youtube", "com.netflix.mediaclient")));

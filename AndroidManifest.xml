@@ -9,6 +9,10 @@
     <!-- Labs, off by default: landscape while an app is fullscreen goes through the system
          rotation lock ("modify system settings", allowed by the user in the app's settings). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <!-- Update check, on by default: once a day asks api.github.com for the latest release. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- The labs app list shows launchable apps. -->
     <queries>
@@ -27,6 +31,11 @@
         android:label="@string/app_name"
         android:icon="@android:drawable/ic_menu_my_calendar"
         android:allowBackup="false">
+
+        <service
+            android:name=".UpdateCheck"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <activity
             android:name=".SettingsActivity"

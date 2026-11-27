@@ -127,6 +127,17 @@ public class SettingsActivity extends Activity {
         number(getString(R.string.unlock_fade), getString(R.string.clock_like_fade_help),
                 Prefs.UNLOCK_FADE_MS, Prefs.DEF_UNLOCK_FADE_MS, 10, false);
 
+        section(getString(R.string.section_updates), null);
+        toggle(getString(R.string.update_check), getString(R.string.update_check_help),
+                Prefs.UPDATE_CHECK, Prefs.DEF_UPDATE_CHECK, this::applyUpdateCheck);
+        trimDivider();
+        UpdateCheck.schedule(this);
+        if (prefs.getBoolean(Prefs.UPDATE_CHECK, Prefs.DEF_UPDATE_CHECK)
+                && !getSharedPreferences("update", MODE_PRIVATE).getBoolean("askedNotify", false)) {
+            getSharedPreferences("update", MODE_PRIVATE).edit().putBoolean("askedNotify", true).apply();
+            askNotifications();
+        }
+
         section(getString(R.string.section_labs), null);
         LinearLayout entry = row();
         entry.addView(labels(getString(R.string.section_labs), getString(R.string.labs_entry_help)),
@@ -138,6 +149,18 @@ public class SettingsActivity extends Activity {
                 .putExtra(EXTRA_LABS, true)));
         card.addView(entry);
         trimDivider();
+    }
+
+    private void applyUpdateCheck() {
+        UpdateCheck.schedule(this);
+        if (prefs.getBoolean(Prefs.UPDATE_CHECK, Prefs.DEF_UPDATE_CHECK)) askNotifications();
+    }
+
+    /** The update notice needs the notification permission (Android 13+). */
+    private void askNotifications() {
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 2);
+        }
     }
 
     private static final String EXTRA_LABS = "labs";

@@ -115,6 +115,12 @@
     <string name="test_channel">테스트 알림</string>
     <string name="test_title">TopLineDate 테스트</string>
     <string name="test_text">상단 바에서 날짜 위치를 확인하세요. 눌러서 지울 수 있습니다.</string>
+    <string name="section_updates">업데이트</string>
+    <string name="update_check">업데이트 확인</string>
+    <string name="update_check_help">하루 한 번 GitHub에서 최신 릴리스를 확인하고, 새 버전이 있으면 알려 줍니다. 앱의 유일한 인터넷 사용이며, 그 밖에는 아무것도 보내지 않습니다.</string>
+    <string name="update_channel">업데이트</string>
+    <string name="update_title">TopLineDate %1$s 업데이트</string>
+    <string name="update_text">눌러서 릴리스 페이지를 엽니다.</string>
     <string name="headsup_channel">테스트 알림 (팝업)</string>
     <string name="headsup_title">TopLineDate 팝업 테스트</string>
     <string name="headsup_text">전체 화면에서 날짜가 뜨지 않아야 합니다.</string>

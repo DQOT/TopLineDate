@@ -239,6 +239,7 @@ public class DateService extends AccessibilityService
         screenDpi = getResources().getConfiguration().densityDpi;
         loadClockGeometry();
         loadSystemTints();
+        UpdateCheck.schedule(this);
         rotator = new FullscreenRotator(this, prefs);
         rotator.restoreIfStale();
 
