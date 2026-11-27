@@ -22,7 +22,7 @@ Made for devices like ColorOS that have no option to show the date in the status
   - It hides with the clock on the recents screen, the notification shade and the lock screen.
 - **Tells screen situations apart.** Split screen, floating windows and their three-dot menu, the keyboard, and rotations while apps open and close can make the status bar look ambiguous. Each case is handled separately so the date never blinks or lingers on its own.
 - **Snaps into place on rotation.** It remembers where the clock sits in portrait and landscape, and moves straight to the new spot while rotating, over an app or on the home screen.
-- **Automatic text color.** Switches between light and dark text to match the status bar brightness of each app.
+- **Automatic text color.** Fades between the system clock's own light and dark text colors to match the status bar brightness.
 - **Per display size settings.** Size and position are saved separately for each display size (Small, Default and so on) and applied automatically.
 - **Follows the system language.** The UI is in Korean when the device language is Korean, and in English for every other language. The default date format in the status bar follows the language too.
 - **No internet permission.** It sends no data anywhere.
@@ -123,7 +123,7 @@ Changes show in the status bar right away. Values in the **Size and position** c
 | Permission | Used for |
 |---|---|
 | Accessibility service | Drawing the date over the status bar, checking window position and size, locating the status bar clock and the icons beside it |
-| Accessibility screenshot | In automatic text color mode, checking only the status bar brightness when the app changes |
+| Accessibility screenshot | In automatic text color mode, checking only the status bar brightness when the app changes or scrolls (once at first, also the clock's text color) |
 | Notifications | The test notification button on the settings screen |
 | Write secure settings (optional, ADB) | Turning accessibility back on after it was switched off |
 | Modify system settings (Labs, optional) | Briefly setting the rotation lock to landscape in fullscreen |

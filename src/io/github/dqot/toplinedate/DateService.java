@@ -72,8 +72,17 @@ public class DateService extends AccessibilityService
 
     private static final String SYSTEM_UI = "com.android.systemui";
     private static final String LAUNCHER = "com.android.launcher";
-    private static final int DARK_TEXT = 0xCC000000;   // before the clock is measured: the ColorOS clock is 80% alpha
-    private static final int LIGHT_TEXT = 0xCCFFFFFF;
+    // The status bar's two text tints, [0] over dark bars (white), [1] over light bars (black).
+    // Seeded from SystemUI's light_mode / dark_mode_icon_color_single_tone (ColorOS: white 80%,
+    // black 90%), then checked once against the real clock: Pixel's resource says black 60% but
+    // its clock is drawn opaque. A confirmed tint is kept until SystemUI is updated.
+    private final int[] tint = {0xFFFFFFFF, 0x99000000};   // AOSP values until read
+    private final int[] resourceTint = tint.clone();
+    private final boolean[] tintFixed = new boolean[2];
+    private final int[] pendingAlpha = {-1, -1};
+    private final Rect clockBox = new Rect();               // last clock bounds, measured for the tint
+    private long systemUiVersion;
+    private static final int COLOR_FADE_MS = 120;           // SystemUI's tint animation
     private static final PathInterpolator EASE = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
     private static final android.view.animation.Interpolator ACCEL = new android.view.animation.AccelerateInterpolator();
     // The bar drops in fast and settles slowly.
@@ -133,8 +142,6 @@ public class DateService extends AccessibilityService
     private AccessibilityNodeInfo clockNode;
     private boolean clockVisible = true;
     private int clockRight = -1;
-    private final Rect clockBox = new Rect();   // last clock bounds, for measuring its text alpha
-    private int textAlpha = 0xCC;                // the system clock's measured alpha, 0-255
     private int iconsWidth;                         // e.g. a notification badge after the clock
     private int anchorRight = -1;                   // clock right edge plus those icons
     private int anchorCenterY;
@@ -159,8 +166,10 @@ public class DateService extends AccessibilityService
     private FullscreenRotator rotator;              // labs: landscape while fullscreen
 
     // ---- colour -------------------------------------------------------------------------------
-    private int autoColor = LIGHT_TEXT;
-    private final HashMap<String, Integer> colorByApp = new HashMap<>();
+    private boolean autoDark;
+    private int autoColor = tint[0];
+    private ValueAnimator colorAnim;
+    private final HashMap<String, Boolean> darkByApp = new HashMap<>();
     private long lastShot;
 
     private final Runnable clearPredictShow = () -> {
@@ -188,6 +197,7 @@ public class DateService extends AccessibilityService
         checkStatusBar();
     };
     private final Runnable sampler = this::sampleBar;
+    private final Runnable scrollSettled = () -> scheduleSample(0);
     private final Runnable pendingCheck = this::checkStatusBar;
     private long pollUntil;
     private final Runnable clockPoll = new Runnable() {
@@ -220,6 +230,7 @@ public class DateService extends AccessibilityService
         dpi = Prefs.activeDpi(this, prefs);
         screenDpi = getResources().getConfiguration().densityDpi;
         loadClockGeometry();
+        loadSystemTints();
         rotator = new FullscreenRotator(this, prefs);
         rotator.restoreIfStale();
 
@@ -392,6 +403,17 @@ public class DateService extends AccessibilityService
         CharSequence pkg = event.getPackageName();
         boolean fromSystemUi = pkg != null && SYSTEM_UI.contentEquals(pkg);
 
+        // An app scrolling can bring a light or dark area under the bar: look again about once per
+        // screenshot slot while it keeps scrolling, and once more when it has settled.
+        if (type == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            if (!fromSystemUi && view != null && autoColorMode()) {
+                if (!handler.hasCallbacks(sampler)) handler.postDelayed(sampler, 300);
+                handler.removeCallbacks(scrollSettled);
+                handler.postDelayed(scrollSettled, 400);
+            }
+            return;
+        }
+
         // While the clock is hidden, any activity may mean it is back: SystemUI reports that late,
         // so look right away and keep looking briefly after a screen change.
         boolean content = type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
@@ -522,12 +544,8 @@ public class DateService extends AccessibilityService
     private void onAppShown(String app) {
         foreground = app;
         appShownAt = SystemClock.uptimeMillis();
-        Integer remembered = colorByApp.get(app);
-        if (remembered != null) remembered = (textAlpha << 24) | (remembered & 0xFFFFFF);
-        if (remembered != null && autoColorMode() && remembered != autoColor) {
-            autoColor = remembered;   // right colour from the first frame
-            view.setTextColor(autoColor);
-        }
+        Boolean remembered = darkByApp.get(app);
+        if (remembered != null) setAutoDark(remembered);   // right colour from the first frame
         scheduleSample(250);
     }
 
@@ -824,8 +842,6 @@ public class DateService extends AccessibilityService
 
     private void loadClockGeometry() {
         SharedPreferences saved = getSharedPreferences("anchor", MODE_PRIVATE);
-        textAlpha = saved.getInt("textAlpha", 0xCC);
-        autoColor = (textAlpha << 24) | (autoColor & 0xFFFFFF);
         shift = saved.getInt("shift@" + screenDpi, 0);
         for (int o = 0; o < 2; o++) {
             clockBase[o] = saved.getInt("base" + o + "@" + screenDpi, Prefs.defClockBase(o, screenDpi));
@@ -1067,6 +1083,7 @@ public class DateService extends AccessibilityService
                 ? Typeface.DEFAULT : Typeface.create(family, Typeface.NORMAL);
         int weight = Math.max(100, Math.min(900, prefs.getInt(Prefs.WEIGHT, Prefs.DEF_WEIGHT)));
         view.setTypeface(Typeface.create(base, weight, false));
+        if (colorAnim != null) colorAnim.cancel();
         view.setTextColor(currentColor());
         if (shown) view.setTranslationY(fineY());
     }
@@ -1128,12 +1145,10 @@ public class DateService extends AccessibilityService
                 if (soft == null) return;
                 float luminance = barLuminance(soft, Math.max(4, barHeight));
                 boolean dark = luminance > 0.55f;
-                if (clockVisible && statusBarVisible) learnTextAlpha(soft, dark);
+                if (clockVisible && statusBarVisible && !tintFixed[dark ? 1 : 0]) checkTint(soft, dark);
                 soft.recycle();
-                int color = (textAlpha << 24) | (dark ? 0x000000 : 0xFFFFFF);
-                colorByApp.put(foreground, color);
-                autoColor = color;
-                if (autoColorMode()) view.setTextColor(autoColor);
+                darkByApp.put(foreground, dark);
+                setAutoDark(dark);
             }
 
             @Override
@@ -1143,12 +1158,39 @@ public class DateService extends AccessibilityService
         });
     }
 
+    /** Seeds the two tints from SystemUI's resources, or takes the ones confirmed earlier. */
+    private void loadSystemTints() {
+        String[] names = {"light_mode_icon_color_single_tone", "dark_mode_icon_color_single_tone"};
+        try {
+            android.content.res.Resources res = getPackageManager().getResourcesForApplication(SYSTEM_UI);
+            for (int m = 0; m < 2; m++) {
+                int id = res.getIdentifier(names[m], "color", SYSTEM_UI);
+                if (id != 0) resourceTint[m] = res.getColor(id, null);
+            }
+            systemUiVersion = getPackageManager().getPackageInfo(SYSTEM_UI, 0).getLongVersionCode();
+        } catch (Exception e) {
+            Log.w(TAG, "SystemUI tints not readable, using defaults", e);
+        }
+        SharedPreferences saved = getSharedPreferences("anchor", MODE_PRIVATE);
+        if (saved.contains("textAlpha")) saved.edit().remove("textAlpha").apply();   // 1.2.0 dev builds
+        boolean same = saved.getLong("tintVersion", -1) == systemUiVersion;
+        for (int m = 0; m < 2; m++) {
+            tintFixed[m] = same && saved.contains("tint" + m);
+            tint[m] = tintFixed[m] ? saved.getInt("tint" + m, resourceTint[m]) : resourceTint[m];
+            pendingAlpha[m] = -1;
+        }
+        Log.i(TAG, String.format("tints white=#%08x%s black=#%08x%s", tint[0], tintFixed[0] ? " (confirmed)" : "",
+                tint[1], tintFixed[1] ? " (confirmed)" : ""));
+        autoColor = tint[autoDark ? 1 : 0];
+    }
+
     /**
-     * Measures how opaque the system clock's digits are: the ColorOS clock is 80% alpha, Pixel's is
-     * opaque. Background = median of the clock box (digits cover well under half of it); the
-     * strongest stroke pixels give the alpha, since a pixel = a * text + (1 - a) * background.
+     * Checks a tint against the clock's digits, over a plain bar only. A pixel blends as
+     * a * text + (1 - a) * background: background = median of the clock box (the digits cover well
+     * under half), text = the 98th-percentile stroke. Near the resource value (within the method's
+     * bias of a few percent) the resource is confirmed; otherwise two agreeing samples replace it.
      */
-    private void learnTextAlpha(Bitmap bitmap, boolean darkText) {
+    private void checkTint(Bitmap bitmap, boolean darkText) {
         Rect box = new Rect(clockBox);
         if (box.isEmpty() || !box.intersect(0, 0, bitmap.getWidth(), bitmap.getHeight())) return;
         int n = box.width() * box.height();
@@ -1161,23 +1203,53 @@ public class DateService extends AccessibilityService
                 lum[i++] = (0.2126f * Color.red(c) + 0.7152f * Color.green(c) + 0.0722f * Color.blue(c)) / 255f;
             }
         }
-        float[] sorted = lum.clone();
-        Arrays.sort(sorted);
-        float background = sorted[n / 2];
-        float text = darkText ? 0f : 1f;
-        float range = Math.abs(text - background);
-        // Only over a plain background: behind a wallpaper the median is not what the digits blend with.
-        float spread = darkText ? sorted[(int) (n * 0.9f)] - background : background - sorted[(int) (n * 0.1f)];
-        // 98th percentile of the stroke toward the text colour: core pixels, not anti-aliased edges.
-        float core = darkText ? sorted[(int) (n * 0.02f)] : sorted[(int) (n * 0.98f)];
-        float alpha = range > 0f ? Math.abs(core - background) / range : 0f;
-        int measured = Math.round(Math.max(0.4f, Math.min(1f, alpha)) * 255f);
-        boolean usable = range >= 0.35f && spread <= 0.12f;   // enough contrast, plain background
-        Log.i(TAG, "clock alpha " + measured + (usable ? "" : " (skipped)") + " bg=" + background
-                + " core=" + core + " spread=" + spread + " box=" + box.toShortString());
-        if (!usable || Math.abs(measured - textAlpha) < 8) return;   // < 8: noise
-        textAlpha = measured;
-        getSharedPreferences("anchor", MODE_PRIVATE).edit().putInt("textAlpha", textAlpha).apply();
+        Arrays.sort(lum);
+        float background = lum[n / 2];
+        float range = darkText ? background : 1f - background;
+        float spread = darkText ? lum[(int) (n * 0.9f)] - background : background - lum[(int) (n * 0.1f)];
+        float core = darkText ? lum[(int) (n * 0.02f)] : lum[(int) (n * 0.98f)];
+        int m = darkText ? 1 : 0;
+        if (range < 0.35f || spread > 0.12f) return;   // too little contrast, or a busy wallpaper
+        int alpha = Math.round(Math.max(0.3f, Math.min(1f, Math.abs(core - background) / range)) * 255f);
+        int resourceAlpha = Color.alpha(resourceTint[m]);
+        int fixed;
+        if (Math.abs(alpha - resourceAlpha) <= 16) {
+            fixed = resourceAlpha;
+        } else if (pendingAlpha[m] >= 0 && Math.abs(alpha - pendingAlpha[m]) <= 10) {
+            fixed = (alpha + pendingAlpha[m] + 1) / 2;
+        } else {
+            pendingAlpha[m] = alpha;
+            Log.i(TAG, "tint " + m + " measured " + alpha + ", resource " + resourceAlpha + ": checking again");
+            scheduleSample(1200);
+            return;
+        }
+        tint[m] = (fixed << 24) | (resourceTint[m] & 0xFFFFFF);
+        tintFixed[m] = true;
+        getSharedPreferences("anchor", MODE_PRIVATE).edit()
+                .putLong("tintVersion", systemUiVersion).putInt("tint" + m, tint[m]).apply();
+        Log.i(TAG, String.format("tint %d confirmed #%08x (measured %d)", m, tint[m], alpha));
+    }
+
+    private void setAutoDark(boolean dark) {
+        autoDark = dark;
+        setAutoColor(tint[dark ? 1 : 0]);
+    }
+
+    /** Changes the automatic colour, fading like SystemUI tints the clock when the date is up. */
+    private void setAutoColor(int color) {
+        autoColor = color;
+        if (view == null || !autoColorMode()) return;
+        if (colorAnim != null) colorAnim.cancel();
+        int from = view.getCurrentTextColor();
+        if (from == color) return;
+        if (!shown || view.getVisibility() != View.VISIBLE || view.getAlpha() == 0f) {
+            view.setTextColor(color);
+            return;
+        }
+        colorAnim = ValueAnimator.ofArgb(from, color);
+        colorAnim.setDuration(COLOR_FADE_MS);
+        colorAnim.addUpdateListener(a -> view.setTextColor((int) a.getAnimatedValue()));
+        colorAnim.start();
     }
 
     /** Median brightness of two rows near the top and bottom of the bar, away from the text. */

@@ -16,6 +16,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- The status bar's two text tints are read from SystemUI's resources. -->
+        <package android:name="com.android.systemui" />
     </queries>
 
     <!-- Granted once over adb; lets opening the app re-enable its own accessibility service. -->
