@@ -171,6 +171,9 @@ public class DateService extends AccessibilityService
     private ValueAnimator colorAnim;
     private final HashMap<String, Boolean> darkByApp = new HashMap<>();
     private long lastShot;
+    // takeScreenshot allows one call per 333 ms (measured on Android 17: ColorOS and Pixel);
+    // Android 11-13 allowed one per second.
+    private static final long SHOT_GAP_MS = Build.VERSION.SDK_INT >= 34 ? 340 : 1050;
 
     private final Runnable clearPredictShow = () -> {
         predictShown = false;
@@ -197,7 +200,12 @@ public class DateService extends AccessibilityService
         checkStatusBar();
     };
     private final Runnable sampler = this::sampleBar;
-    private final Runnable scrollSettled = () -> scheduleSample(0);
+    // Once more 0.6 s later: some apps fade a header in after the list stops.
+    private final Runnable scrollLate = () -> scheduleSample(0);
+    private final Runnable scrollSettled = () -> {
+        scheduleSample(0);
+        handler.postDelayed(scrollLate, 600);
+    };
     private final Runnable pendingCheck = this::checkStatusBar;
     private long pollUntil;
     private final Runnable clockPoll = new Runnable() {
@@ -403,13 +411,15 @@ public class DateService extends AccessibilityService
         CharSequence pkg = event.getPackageName();
         boolean fromSystemUi = pkg != null && SYSTEM_UI.contentEquals(pkg);
 
-        // An app scrolling can bring a light or dark area under the bar: look again about once per
-        // screenshot slot while it keeps scrolling, and once more when it has settled.
+        // An app scrolling can bring a light or dark area under the bar: look right away, then once
+        // per screenshot slot while it keeps scrolling, and once more as soon as it has settled
+        // (no scroll event for 150 ms; a fling keeps sending them until it stops).
         if (type == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             if (!fromSystemUi && view != null && autoColorMode()) {
-                if (!handler.hasCallbacks(sampler)) handler.postDelayed(sampler, 300);
+                if (!handler.hasCallbacks(sampler)) handler.post(sampler);
                 handler.removeCallbacks(scrollSettled);
-                handler.postDelayed(scrollSettled, 400);
+                handler.removeCallbacks(scrollLate);
+                handler.postDelayed(scrollSettled, 150);
             }
             return;
         }
@@ -1129,8 +1139,8 @@ public class DateService extends AccessibilityService
     private void sampleBar() {
         if (!attached || view.getVisibility() != View.VISIBLE || !autoColorMode()) return;
         long now = SystemClock.uptimeMillis();
-        if (now - lastShot < 1100) {   // the screenshot API is rate limited
-            handler.postDelayed(sampler, 1100 - (now - lastShot));
+        if (now - lastShot < SHOT_GAP_MS) {   // the screenshot API is rate limited
+            handler.postDelayed(sampler, SHOT_GAP_MS - (now - lastShot));
             return;
         }
         lastShot = now;
@@ -1162,6 +1172,10 @@ public class DateService extends AccessibilityService
             @Override
             public void onFailure(int errorCode) {
                 Log.w(TAG, "screenshot failed " + errorCode);
+                if (errorCode == ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT) {
+                    handler.removeCallbacks(sampler);
+                    handler.postDelayed(sampler, SHOT_GAP_MS);
+                }
             }
         });
     }
