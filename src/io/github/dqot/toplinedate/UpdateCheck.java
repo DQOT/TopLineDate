@@ -98,7 +98,9 @@ public class UpdateCheck extends JobService {
     }
 
     private boolean notifyUpdate(String tag, String url) {
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        // A runtime permission from Android 13; before that it reads as denied though notifications work.
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return false;
         }
         NotificationManager nm = getSystemService(NotificationManager.class);
